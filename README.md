@@ -22,7 +22,7 @@ See the [release page](https://github.com/kyle-tennison/nAccelerate/releases/lat
 
 <p align="center">
   <picture>
-    <img src="assets/screenshot.png" alt="Screenshot" width="800">
+    <img src="assets/screenshot.png" alt="Screenshot">
   </picture>
 </p>
 
@@ -39,7 +39,7 @@ To run a notebook:
 
 <p align="center">
   <picture>
-    <img src="assets/naccelerate-settings.png" alt="Settings Page" width="200">
+    <img src="assets/naccelerate-settings.png" alt="Settings Page" width="300">
   </picture>
 </p>
 
