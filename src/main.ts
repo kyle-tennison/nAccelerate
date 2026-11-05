@@ -152,12 +152,14 @@ function onStats(st: Stats) {
   schedule();
 }
 
-/* Step ticker: shows the step that just finished above the one that is probably running now.
+/* Step feed: finished steps stack upward and fade out, with the step that is probably running at the bottom.
    The log only reports a block when it finishes, so the running one is inferred from the notebook:
    the first block, in file order, whose inputs have all finished. When many steps finish at once
-   they are revealed one by one, briefly, so each can be seen. */
+   they are revealed one by one, and the list keeps gliding up instead of jumping. */
 
-const ticker = { shown: 0, active: null as string | null, since: 0, events: [] as StepEvent[], logLen: -1 };
+const ROW_H = 20;
+const KEEP_DONE = 4;
+const ticker = { shown: 0, rendered: 0, active: null as string | null, since: 0, events: [] as StepEvent[], logLen: -1 };
 
 function events(): StepEvent[] {
   if (ticker.logLen !== S.log.length) { ticker.events = stepEvents(S.log); ticker.logLen = S.log.length; }
@@ -180,35 +182,63 @@ function runningBlock(blocks: Block[], shown: StepEvent[]): string | null {
 
 const short = (ms: number) => (ms < 1000 ? `${ms}ms` : ms < 60000 ? `${(ms / 1000).toFixed(1)}s` : fmt(ms));
 
-function replay(el: HTMLElement) {
-  el.classList.remove("tick");
-  void el.offsetWidth;
-  el.classList.add("tick");
+function row(cls: string, name: string, time: string, title = "") {
+  const el = document.createElement("div");
+  el.className = `run-row ${cls}`;
+  el.dataset.name = name;
+  el.title = title;
+  el.innerHTML = `<i class="${cls === "now" ? "spin" : "ic"}"></i><span class="nm trunc"></span><span class="t num"></span>`;
+  el.querySelector(".nm")!.textContent = name;
+  el.querySelector(".t")!.textContent = time;
+  return el;
+}
+
+function finish(el: HTMLElement, e: StepEvent) {
+  el.className = `run-row done${e.error ? " err" : ""}`;
+  el.title = e.error ?? "";
+  el.querySelector(".spin")?.setAttribute("class", "ic");
+  el.querySelector(".nm")!.textContent = e.error ? `${e.name} failed` : e.name;
+  el.querySelector(".t")!.textContent = e.error ? "" : short(e.ms ?? 0);
+}
+
+// Pushes the list down by the rows just added, then lets it ease back to rest, continuing any slide already in flight.
+function glide(list: HTMLElement, rows: number) {
+  if (!rows) return;
+  const current = new DOMMatrixReadOnly(getComputedStyle(list).transform).m42;
+  list.style.transition = "none";
+  list.style.transform = `translateY(${current + rows * ROW_H}px)`;
+  void list.offsetHeight;
+  list.style.transition = "";
+  list.style.transform = "translateY(0)";
 }
 
 function renderSteps() {
-  const p = S.phase, evs = events();
+  const p = S.phase, evs = events(), list = $("run-list");
   const solving = p === "solve" || (p === "cancelling" && evs.length > 0);
   const blocks = S.folder?.blocks ?? [];
-  const shown = evs.slice(0, ticker.shown);
-  const active = solving && blocks.length ? runningBlock(blocks, shown) : null;
-  if (active !== ticker.active) { ticker.active = active; ticker.since = Date.now(); }
 
-  const done = $("run-done"), now = $("run-now");
-  const last = shown[shown.length - 1];
-  done.hidden = !solving || !last;
-  if (last) {
-    done.classList.toggle("err", !!last.error);
-    done.querySelector(".nm")!.textContent = last.error ? `${last.name} failed` : last.name;
-    done.querySelector(".t")!.textContent = last.error ? "" : short(last.ms ?? 0);
-    done.title = last.error ?? "";
+  if (!solving || (!blocks.length && ticker.shown === 0)) {
+    if (list.childElementCount) { list.replaceChildren(); ticker.rendered = 0; }
+  } else {
+    let added = 0;
+    while (ticker.rendered < ticker.shown && ticker.rendered < evs.length) {
+      const e = evs[ticker.rendered++];
+      const now = list.querySelector<HTMLElement>(".run-row.now");
+      if (now && now.dataset.name === e.name) finish(now, e);
+      else { const el = row("done", e.name, ""); finish(el, e); list.insertBefore(el, now); added++; }
+    }
+    const active = p === "solve" && blocks.length ? runningBlock(blocks, evs.slice(0, ticker.shown)) : null;
+    let now = list.querySelector<HTMLElement>(".run-row.now");
+    if (active !== ticker.active) { ticker.active = active; ticker.since = Date.now(); }
+    if (!active) now?.remove();
+    else if (now) { now.dataset.name = active; now.querySelector(".nm")!.textContent = active; }
+    else { now = row("now", active, ""); list.append(now); added++; }
+    if (active && now) { const ms = Date.now() - ticker.since; now.querySelector(".t")!.textContent = ms < 60000 ? `${Math.floor(ms / 1000)}s` : fmt(ms); }
+    const done = list.querySelectorAll(".run-row.done");
+    for (let i = 0; i < done.length - KEEP_DONE; i++) done[i].remove();
+    glide(list, added);
   }
-  now.hidden = !active || p === "cancelling";
-  if (active) {
-    now.querySelector(".nm")!.textContent = active;
-    now.querySelector(".t")!.textContent = short(Date.now() - ticker.since).replace(/\.\ds$/, "s");
-  }
-  $("run").hidden = done.hidden && now.hidden;
+  $("run").hidden = !list.childElementCount;
 
   // Outside the solve, the latest log line is shown instead.
   const line = S.log.length ? pretty(S.log[S.log.length - 1]) : { text: S.folder ? "Ready to send" : "Choose a folder to get started", kind: "" };
@@ -220,13 +250,11 @@ function renderSteps() {
 function advanceTicker() {
   const evs = events();
   if (!running()) { ticker.shown = evs.length; return; }
-  if (ticker.shown >= evs.length) { renderSteps(); return; }
-  const backlog = evs.length - ticker.shown;
-  ticker.shown += backlog > 40 ? Math.ceil(backlog / 20) : 1;
-  const prevActive = ticker.active;
+  if (ticker.shown < evs.length) {
+    const backlog = evs.length - ticker.shown;
+    ticker.shown += backlog > 40 ? Math.ceil(backlog / 20) : 1;
+  }
   renderSteps();
-  replay($("run-done"));
-  if (ticker.active !== prevActive) replay($("run-now"));
 }
 
 function onStatus(p: Phase) {
@@ -249,7 +277,8 @@ function localLog(level: "I" | "W" | "E", text: string) {
 async function start() {
   if (!S.folder?.notebook) return;
   S.log = []; S.coreHist = []; S.memGb = 0; S.memPeak = 0; S.gpus = []; S.upload = null;
-  ticker.shown = 0; ticker.active = null;
+  ticker.shown = 0; ticker.rendered = 0; ticker.active = null;
+  $("run-list").replaceChildren();
   S.t0 = Date.now(); S.tEnd = 0; S.phase = "queued";
   S.settings.resources = { ...S.req };
   await be.saveSettings(S.settings);
