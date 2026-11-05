@@ -54,6 +54,7 @@
           <div class="sec">
             <div class="sec-h">Solver<span class="sp"></span><button class="errs" type="button" id="errs" hidden></button><button class="link" type="button" id="log-toggle">Show all logs</button></div>
             <div class="prog-row"><div class="prog" id="prog"><i></i></div><span class="xs dim num" data-bind="progTxt"></span></div>
+            <div class="prog-row sub" id="iter-row" hidden><div class="prog" id="iter-prog"><i></i></div><span class="xs dim num" data-bind="iterTxt"></span></div>
             <div id="obj-wrap" style="position:relative" hidden>
               <canvas class="obj" id="obj" aria-label="Objective (log scale) and max change over time"></canvas>
               <div class="tip" id="tip" hidden></div>

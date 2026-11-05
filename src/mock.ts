@@ -48,7 +48,7 @@ export class MockBackend implements Backend {
     return false;
   }
   async pickFolder(): Promise<FolderInfo> {
-    return { path: "/preview/bracket_topopt", name: "bracket_topopt", notebook: "bracket_topopt.ntop" };
+    return { path: "/preview/bracket_topopt", name: "bracket_topopt", notebook: "bracket_topopt.ntop", steps: 178 };
   }
   async listen(h: Handlers) {
     this.h = h;

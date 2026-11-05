@@ -131,6 +131,7 @@ canvas.obj { width: 100%; height: 76px; display: block; cursor: crosshair }
 
 .prog-row { display: flex; align-items: center; gap: 10px }
 .prog-row .prog { flex: 1 }
+.prog-row.sub .prog > i { background: var(--accent-2) }
 .prog { height: 3px; background: var(--heat-0); border-radius: 2px; overflow: hidden; position: relative }
 .prog > i { position: absolute; inset: 0 auto 0 0; background: var(--viz); transition: width .3s }
 .prog.indet > i { width: 30% !important; animation: slide 1.4s ease-in-out infinite }

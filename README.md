@@ -13,6 +13,16 @@ A small desktop widget (Tauri) that sends an nTop project folder to a more power
 
 The system OpenSSH client is used, so the server must accept key-based login (no password prompts). The server is assumed to be Linux.
 
+## Step count
+
+When a folder is chosen, the app reads the notebook's block list straight from the `.ntop` file ([`notebook.rs`](src-tauri/src/notebook.rs)) to know how many steps the run should log. The solver bar then advances by one for each `… complete Nms` or `[E]: <block>: …` line, and a second bar tracks iterations while an optimization runs. The count assumes every block succeeds; a failed block skips its dependents, so a run with errors finishes short of the total. The `.ntop` layout is undocumented, so if the file doesn't match what's expected the bar falls back to an indeterminate one.
+
+To check the count for a notebook:
+
+```bash
+cd src-tauri && cargo run --example count_steps -- path/to/notebook.ntop
+```
+
 ## Server wrapper
 
 [`server/ntop`](server/ntop) is a wrapper that runs `ntopcl` in Docker. Put it on the server's `PATH` and set `IMAGE`. It names the container after `NACCEL_JOB` and applies `--cpuset-cpus`, `--memory` and `--gpus` from the resources chosen in the widget. Note that `ntopcl` takes the password as `-w`, so it is visible in the server's process list while a solve runs.

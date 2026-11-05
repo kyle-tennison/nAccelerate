@@ -36,6 +36,16 @@ export function lineKind(raw: string): Pretty["kind"] {
   return "";
 }
 
+// A step is logged once, either as "<block> complete <n>ms" or as an error "[E]: <block>: <message>". Errors the app itself logs are not steps.
+export function countSteps(log: string[]): number {
+  let n = 0;
+  for (const l of log) {
+    if (/^\d\d:\d\d:\d\d \[I\]: .+ complete \d+ms$/.test(l)) n++;
+    else if (/^\d\d:\d\d:\d\d \[E\]: [^:]+: /.test(l) && !/\[E\]: nAccelerate: /.test(l)) n++;
+  }
+  return n;
+}
+
 export function parseIters(log: string[]): Iteration[] {
   const out: Iteration[] = [];
   let dayOffset = 0;

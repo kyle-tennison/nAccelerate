@@ -1,4 +1,5 @@
 mod job;
+pub mod notebook;
 mod remote;
 mod settings;
 mod stats;
@@ -21,6 +22,7 @@ struct FolderInfo {
     path: String,
     name: String,
     notebook: Option<String>,
+    steps: Option<u32>,
 }
 
 #[tauri::command]
@@ -59,10 +61,13 @@ fn inspect_folder(path: String) -> Result<FolderInfo, String> {
         .filter(|n| n.to_lowercase().ends_with(".ntop") && !n.to_lowercase().ends_with("_solved.ntop"))
         .collect();
     notebooks.sort();
+    let notebook = notebooks.into_iter().next();
+    let steps = notebook.as_ref().and_then(|n| notebook::count_steps(&dir.join(n)).ok()).map(|c| c.steps);
     Ok(FolderInfo {
         name: dir.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_else(|| path.clone()),
         path,
-        notebook: notebooks.into_iter().next(),
+        notebook,
+        steps,
     })
 }
 

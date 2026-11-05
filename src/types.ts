@@ -40,6 +40,7 @@ export interface FolderInfo {
   path: string;
   name: string;
   notebook: string | null;
+  steps: number | null;
 }
 
 export interface JobRequest extends Resources {

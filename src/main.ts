@@ -5,7 +5,7 @@ import "@fontsource/ibm-plex-mono/400.css";
 import "@fontsource/archivo/800.css";
 import { getBackend } from "./backend";
 import { CORE_HISTORY, ObjectiveChart, drawCores } from "./charts";
-import { lineKind, optResult, parseIters, pretty } from "./logparse";
+import { countSteps, lineKind, optResult, parseIters, pretty } from "./logparse";
 import { DEFAULT_SETTINGS } from "./mock";
 import type { FolderInfo, Gpu, Phase, Progress, ResourceKey, Resources, Settings, Stats } from "./types";
 
@@ -106,11 +106,17 @@ function render() {
   const its = parseIters(S.log), lastIt = its[its.length - 1], finished = optResult(S.log);
   const iterating = !!lastIt && !finished && p === "solve";
   const up = p === "upload" || p === "download" ? S.upload : null;
+  // The main bar counts notebook steps (upload and download use bytes instead); iterations get their own bar while they run.
+  const total = S.folder?.steps ?? 0;
+  const steps = p === "solve" && total ? Math.min(total, countSteps(S.log)) : null;
   const pr = $("prog");
-  pr.classList.toggle("indet", live && !iterating && !up);
+  pr.classList.toggle("indet", live && steps === null && !up);
   (pr.firstChild as HTMLElement).style.width =
-    p === "done" ? "100%" : iterating ? `${(lastIt.i / lastIt.max) * 100}%` : up ? `${(up.done / Math.max(1, up.total)) * 100}%` : "0%";
-  bind("progTxt", (e) => (e.textContent = iterating ? `Iter ${lastIt.i}/${lastIt.max}` : up ? `${mb(up.done)} / ${mb(up.total)} MB` : ""));
+    p === "done" ? "100%" : steps !== null ? `${(steps / total) * 100}%` : up ? `${(up.done / Math.max(1, up.total)) * 100}%` : "0%";
+  bind("progTxt", (e) => (e.textContent = steps !== null ? `Step ${steps}/${total}` : up ? `${mb(up.done)} / ${mb(up.total)} MB` : ""));
+  $("iter-row").hidden = !iterating;
+  if (iterating) (($("iter-prog").firstChild) as HTMLElement).style.width = `${(lastIt.i / lastIt.max) * 100}%`;
+  bind("iterTxt", (e) => (e.textContent = iterating ? `Iter ${lastIt.i}/${lastIt.max}` : ""));
   $("obj-wrap").hidden = !iterating || its.length < 2;
   if (iterating && its.length >= 2) objective.draw(its);
 
