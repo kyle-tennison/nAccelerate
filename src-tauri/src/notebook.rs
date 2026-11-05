@@ -26,10 +26,20 @@ const MAX_MAIN_BYTES: u64 = 64 * 1024 * 1024;
 
 #[derive(Serialize, Clone, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
+pub struct Block {
+    pub name: String,
+    /// Names of the blocks this one takes inputs from (unnamed input values are left out).
+    pub deps: Vec<String>,
+}
+
+#[derive(Serialize, Clone, Debug, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct StepCount {
     pub steps: u32,
     /// More than one group means nested groups or custom blocks, which have not been checked against a run.
     pub groups: u32,
+    /// The steps in file order, used to guess which block is running between log lines.
+    pub blocks: Vec<Block>,
 }
 
 fn u64_at(buf: &[u8], at: usize) -> u64 {
@@ -92,13 +102,32 @@ pub fn count_steps(path: &Path) -> Result<StepCount, String> {
         .map_err(|e| format!("Could not read the block list: {e}"))?;
     let code = value.get("code").and_then(|c| c.as_array()).ok_or("Block list has no code array")?;
 
-    let mut count = StepCount { steps: 0, groups: 0 };
+    let func = |r: &serde_json::Value| r.get("func").and_then(|f| f.as_str()).unwrap_or("").to_string();
+    let is_step = |f: &str| !f.is_empty() && !f.starts_with("core.group");
+    let names: std::collections::HashMap<u64, String> = code
+        .iter()
+        .filter(|r| is_step(&func(r)))
+        .filter_map(|r| Some((r.get("id")?.as_u64()?, r.get("name")?.as_str()?.to_string())))
+        .collect();
+
+    let mut count = StepCount { steps: 0, groups: 0, blocks: Vec::new() };
     for record in code {
-        let func = record.get("func").and_then(|f| f.as_str()).unwrap_or("");
-        if func.starts_with("core.group") {
+        let f = func(record);
+        if f.starts_with("core.group") {
             count.groups += 1;
-        } else if !func.is_empty() {
+        } else if is_step(&f) {
             count.steps += 1;
+            let name = record.get("name").and_then(|n| n.as_str()).unwrap_or_default().to_string();
+            let mut deps: Vec<String> = record
+                .get("inputs")
+                .and_then(|i| i.as_array())
+                .into_iter()
+                .flatten()
+                .filter_map(|i| i.get("instanceId")?.as_u64())
+                .filter_map(|id| names.get(&id).cloned())
+                .collect();
+            deps.dedup();
+            count.blocks.push(Block { name, deps });
         }
     }
     Ok(count)
@@ -133,11 +162,15 @@ mod tests {
     #[test]
     fn counts_named_blocks_and_skips_groups_and_values() {
         let json = r#"{"code":[{"id":1,"name":"Root","func":"core.group"},{"id":2,"name":"Scalar_anon_1","func":""},
-            {"id":3,"name":"Mesh_0","func":"mesh.from_body"},{"id":4,"name":"Radius","func":"core.var.scalar"},
+            {"id":3,"name":"Mesh_0","func":"mesh.from_body","inputs":[{"instanceId":4},{"instanceId":2},{"instanceId":0}]},
+            {"id":4,"name":"Radius","func":"core.var.scalar"},
             {"id":5,"name":"Plane List_0","func":"core.list.plane"},{"id":6,"name":"Brücke","func":"core.concatenate_lists"}],"other":1}"#;
         let path = std::env::temp_dir().join(format!("naccel-steps-{}.ntop", std::process::id()));
         std::fs::write(&path, notebook(json)).unwrap();
-        assert_eq!(count_steps(&path), Ok(StepCount { steps: 4, groups: 1 }));
+        let c = count_steps(&path).unwrap();
+        assert_eq!((c.steps, c.groups), (4, 1));
+        assert_eq!(c.blocks[0], Block { name: "Mesh_0".into(), deps: vec!["Radius".into()] });
+        assert_eq!(c.blocks[3].name, "Brücke");
         std::fs::remove_file(&path).unwrap();
     }
 

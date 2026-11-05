@@ -19,6 +19,14 @@ pub enum ResultMode {
     Replace,
 }
 
+pub const DEFAULT_REMOTE_DIR: &str = "~/naccelerate/jobs";
+/// The runner script the app installs on the server before each job (see `resources/ntop-run.py`).
+pub const DEFAULT_COMMAND: &str = "python3 ~/.naccelerate/ntop-run.py --input {folder}";
+pub const DEFAULT_CANCEL: &str = "docker rm -f {job} || sg docker -c 'docker rm -f {job}'";
+/// Defaults from earlier builds, upgraded on load so existing settings pick up the installed runner.
+const OLD_COMMANDS: [&str; 2] = ["ntop --input {folder}", "taskset -c 0-{cpu_last} ntop --input {folder}"];
+const OLD_CANCELS: [&str; 1] = ["sg docker -c 'docker rm -f {job}'"];
+
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase", default)]
 pub struct SelfHosted {
@@ -38,9 +46,9 @@ impl Default for SelfHosted {
             port: 22,
             user: String::new(),
             key_path: String::new(),
-            remote_dir: "~/naccelerate/jobs".into(),
-            command: "ntop --input {folder}".into(),
-            cancel_command: "sg docker -c 'docker rm -f {job}'".into(),
+            remote_dir: DEFAULT_REMOTE_DIR.into(),
+            command: DEFAULT_COMMAND.into(),
+            cancel_command: DEFAULT_CANCEL.into(),
         }
     }
 }
@@ -119,11 +127,22 @@ fn path(app: &AppHandle) -> Result<PathBuf, String> {
 }
 
 pub fn load(app: &AppHandle) -> Settings {
-    path(app)
+    let mut s: Settings = path(app)
         .ok()
         .and_then(|p| std::fs::read_to_string(p).ok())
         .and_then(|s| serde_json::from_str(&s).ok())
-        .unwrap_or_default()
+        .unwrap_or_default();
+    let sh = &mut s.self_hosted;
+    if sh.command.trim().is_empty() || OLD_COMMANDS.contains(&sh.command.trim()) {
+        sh.command = DEFAULT_COMMAND.into();
+    }
+    if sh.cancel_command.trim().is_empty() || OLD_CANCELS.contains(&sh.cancel_command.trim()) {
+        sh.cancel_command = DEFAULT_CANCEL.into();
+    }
+    if sh.remote_dir.trim().is_empty() {
+        sh.remote_dir = DEFAULT_REMOTE_DIR.into();
+    }
+    s
 }
 
 pub fn save(app: &AppHandle, settings: &Settings) -> Result<(), String> {

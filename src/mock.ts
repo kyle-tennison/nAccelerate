@@ -7,12 +7,24 @@ const TICK_MS = 700;
 export const DEFAULT_SETTINGS: Settings = {
   provider: "self",
   ntopUser: "",
-  selfHosted: { host: "", port: 22, user: "", keyPath: "", remoteDir: "~/naccelerate/jobs", command: "ntop --input {folder}", cancelCommand: "sg docker -c 'docker rm -f {job}'" },
+  selfHosted: { host: "", port: 22, user: "", keyPath: "", remoteDir: "~/naccelerate/jobs", command: "python3 ~/.naccelerate/ntop-run.py --input {folder}", cancelCommand: "docker rm -f {job} || sg docker -c 'docker rm -f {job}'" },
   aws: { region: "us-east-2", profile: "default", spendCap: "$25.00", spot: false, terminate: true },
   results: { mode: "copy", notify: true, showAllLogs: false },
   hostInfo: null,
   resources: null,
 };
+
+// The preview has no notebook to read, so it treats the sample log's steps as a simple chain.
+function previewBlocks() {
+  const blocks: { name: string; deps: string[] }[] = [];
+  let prev: string | null = null;
+  for (const l of SAMPLE_LOG) {
+    const ok = l.match(/\]: (.+) complete \d+ms$/)?.[1], failed = l.match(/\[E\]: ([^:]+): /)?.[1];
+    if (ok) { blocks.push({ name: ok, deps: prev ? [prev] : [] }); prev = ok; }
+    else if (failed) blocks.push({ name: failed, deps: prev ? [prev] : [] });
+  }
+  return blocks;
+}
 
 function stamp() {
   return new Date().toTimeString().slice(0, 8);
@@ -48,7 +60,7 @@ export class MockBackend implements Backend {
     return false;
   }
   async pickFolder(): Promise<FolderInfo> {
-    return { path: "/preview/bracket_topopt", name: "bracket_topopt", notebook: "bracket_topopt.ntop", steps: 178 };
+    return { path: "/preview/bracket_topopt", name: "bracket_topopt", notebook: "bracket_topopt.ntop", steps: 178, blocks: previewBlocks() };
   }
   async listen(h: Handlers) {
     this.h = h;

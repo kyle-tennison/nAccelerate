@@ -36,14 +36,22 @@ export function lineKind(raw: string): Pretty["kind"] {
   return "";
 }
 
+export interface StepEvent {
+  name: string;
+  ms: number | null;
+  error: string | null;
+}
+
 // A step is logged once, either as "<block> complete <n>ms" or as an error "[E]: <block>: <message>". Errors the app itself logs are not steps.
-export function countSteps(log: string[]): number {
-  let n = 0;
+export function stepEvents(log: string[]): StepEvent[] {
+  const out: StepEvent[] = [];
   for (const l of log) {
-    if (/^\d\d:\d\d:\d\d \[I\]: .+ complete \d+ms$/.test(l)) n++;
-    else if (/^\d\d:\d\d:\d\d \[E\]: [^:]+: /.test(l) && !/\[E\]: nAccelerate: /.test(l)) n++;
+    let r = l.match(/^\d\d:\d\d:\d\d \[I\]: (.+) complete (\d+)ms$/);
+    if (r) { out.push({ name: r[1], ms: +r[2], error: null }); continue; }
+    r = l.match(/^\d\d:\d\d:\d\d \[E\]: ([^:]+): (.*)$/);
+    if (r && r[1] !== "nAccelerate") out.push({ name: r[1], ms: null, error: r[2] });
   }
-  return n;
+  return out;
 }
 
 export function parseIters(log: string[]): Iteration[] {

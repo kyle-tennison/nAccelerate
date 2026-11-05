@@ -120,6 +120,7 @@ async fn solve(ctx: &mut Ctx, settings: &Settings, req: &JobRequest, password: O
     ctx.log('I', &format!("Connecting to {target}"));
     ctx.step(remote::run(sh, "true")).await?;
     ctx.log('I', &format!("Connected to {}", sh.host));
+    ctx.step(remote::install_runner(sh)).await?;
 
     ctx.status("upload");
     let entries = upload_entries(&local, &req.notebook)?;
@@ -229,7 +230,7 @@ async fn stop_remote(sh: &crate::settings::SelfHosted, pid: Option<u32>, job: &s
     }
     let cancel = sh.cancel_command.trim();
     if !cancel.is_empty() {
-        script.push_str(&format!("{} >/dev/null 2>&1; ", cancel.replace("{job}", job)));
+        script.push_str(&format!("{{ {}; }} >/dev/null 2>&1; ", cancel.replace("{job}", job)));
     }
     match pid {
         Some(pid) => script.push_str(&format!("sleep 0.2; kill -0 -- -{pid} 2>/dev/null && echo running || echo stopped")),

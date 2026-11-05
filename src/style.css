@@ -170,6 +170,25 @@ canvas.obj { width: 100%; height: 76px; display: block; cursor: crosshair }
 .status.bad b { color: var(--bad) }
 .prov label:has(input:disabled) { opacity: .5; cursor: not-allowed }
 .hr { height: 1px; background: var(--line) }
+.adv > summary { cursor: pointer; font-size: 12.5px; font-weight: 500; color: var(--ink-2); list-style: none; display: flex; align-items: center; gap: 6px }
+.adv > summary::-webkit-details-marker { display: none }
+.adv > summary::before { content: ""; width: 6px; height: 6px; border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor; transform: rotate(-45deg); transition: transform .15s }
+.adv[open] > summary::before { transform: rotate(45deg) }
+.adv > .sec { margin-top: 10px }
+
+/* Solver step ticker: the step that just finished sits above the one now running. */
+.run { display: grid; gap: 3px; font-size: 12.5px }
+.run-done, .run-now { display: flex; align-items: center; gap: 8px; min-width: 0 }
+.run-done { color: var(--ink-2) }
+.run-done.err { color: var(--bad) }
+.run-now .spin { color: var(--viz) }
+.run .nm { flex: 1 }
+.run .t { flex: none; color: var(--ink-2); font-size: 11.5px }
+.run-done.tick { animation: rise .18s ease-out }
+.run-now.tick .nm { animation: enter .18s ease-out }
+@keyframes rise { from { opacity: .3; transform: translateY(9px) } }
+@keyframes enter { from { opacity: 0; transform: translateX(-6px) } }
+@media (prefers-reduced-motion: reduce) { .run-done.tick, .run-now.tick .nm { animation: none } }
 .live canvas, .live .meter { transition: filter .3s, opacity .3s }
 .w.offline .live canvas, .w.offline .live .meter { filter: grayscale(1); opacity: .4 }
 .w.offline .live .sec-h .aside { color: var(--ink-2) }

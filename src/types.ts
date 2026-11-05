@@ -41,6 +41,12 @@ export interface FolderInfo {
   name: string;
   notebook: string | null;
   steps: number | null;
+  blocks: Block[];
+}
+
+export interface Block {
+  name: string;
+  deps: string[];
 }
 
 export interface JobRequest extends Resources {

@@ -23,6 +23,7 @@ struct FolderInfo {
     name: String,
     notebook: Option<String>,
     steps: Option<u32>,
+    blocks: Vec<notebook::Block>,
 }
 
 #[tauri::command]
@@ -62,12 +63,13 @@ fn inspect_folder(path: String) -> Result<FolderInfo, String> {
         .collect();
     notebooks.sort();
     let notebook = notebooks.into_iter().next();
-    let steps = notebook.as_ref().and_then(|n| notebook::count_steps(&dir.join(n)).ok()).map(|c| c.steps);
+    let plan = notebook.as_ref().and_then(|n| notebook::count_steps(&dir.join(n)).ok());
     Ok(FolderInfo {
         name: dir.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_else(|| path.clone()),
         path,
         notebook,
-        steps,
+        steps: plan.as_ref().map(|c| c.steps),
+        blocks: plan.map(|c| c.blocks).unwrap_or_default(),
     })
 }
 

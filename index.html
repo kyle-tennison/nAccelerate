@@ -59,6 +59,10 @@
               <canvas class="obj" id="obj" aria-label="Objective (log scale) and max change over time"></canvas>
               <div class="tip" id="tip" hidden></div>
             </div>
+            <div class="run" id="run" hidden>
+              <div class="run-done" id="run-done" hidden><span class="nm trunc"></span><span class="t num"></span></div>
+              <div class="run-now" id="run-now" hidden><i class="spin"></i><span class="nm trunc"></span><span class="t num"></span></div>
+            </div>
             <div class="latest"><span class="msg trunc" data-bind="latest" id="latest"></span></div>
             <div class="log" id="log" hidden aria-live="polite"></div>
           </div>
@@ -75,7 +79,7 @@
             <div class="sec-h">nTop account</div>
             <label class="field"><span>Username</span><input id="n-user" autocomplete="username" placeholder="you@example.com"></label>
             <label class="field"><span>Password</span><input id="n-pass" type="password" autocomplete="current-password"></label>
-            <span class="xs dim">Used to check out an nTop license on the remote machine.</span>
+            <span class="xs dim">Shared only with remote machine.</span>
             <div class="status" id="signin-out" hidden></div>
           </div>
 
@@ -84,7 +88,7 @@
           <div class="sec">
             <div class="sec-h">Compute</div>
             <div class="prov">
-              <label><input type="radio" name="prov" id="prov-self" value="self"><strong>Self-hosted</strong><span>Your own server over SSH. Free.</span></label>
+              <label><input type="radio" name="prov" id="prov-self" value="self"><strong>Self-hosted</strong><span>Personal SSH server.</span></label>
               <label title="AWS support is coming soon"><input type="radio" name="prov" id="prov-aws" value="aws" disabled><strong>AWS</strong><span>Coming soon.</span></label>
             </div>
           </div>
@@ -96,11 +100,6 @@
             </div>
             <label class="field"><span>User</span><input id="s-user" spellcheck="false"></label>
             <label class="field"><span>SSH key</span><input id="s-key" placeholder="~/.ssh/id_ed25519" spellcheck="false"></label>
-            <label class="field"><span>Remote job folder</span><input id="s-dir" placeholder="~/naccelerate/jobs" spellcheck="false"></label>
-            <label class="field"><span>Solve command</span><input id="s-cmd" spellcheck="false"></label>
-            <span class="xs dim">Runs in the job folder and must print "Saved: &lt;path&gt;". It gets NTOP_EMAIL, NTOP_PASSWORD, NACCEL_JOB, NACCEL_CPUS, NACCEL_CPUSET, NACCEL_MEM_GB and NACCEL_GPUS.</span>
-            <label class="field"><span>Cancel command</span><input id="s-cancel" spellcheck="false"></label>
-            <span class="xs dim">Runs after the solver's processes are killed, for cleanup such as stopping its container. {job} is the job name.</span>
             <div class="row"><button class="btn" type="button" id="test">Test connection</button></div>
             <div class="status" id="test-out" hidden></div>
           </div>
@@ -112,6 +111,16 @@
             <label class="field"><span>When the solve finishes</span><select id="r-mode"><option value="copy">Save as a copy (name_solved.ntop)</option><option value="replace">Replace the local file</option></select></label>
             <label class="check"><input type="checkbox" id="r-logs"> Always show all logs</label>
           </div>
+
+          <details class="adv" id="adv">
+            <summary>Advanced</summary>
+            <div class="sec">
+              <label class="field"><span>Remote job folder</span><input id="s-dir" spellcheck="false"></label>
+              <label class="field"><span>Solve command</span><input id="s-cmd" spellcheck="false"></label>
+              <label class="field"><span>Cancel command</span><input id="s-cancel" spellcheck="false"></label>
+              <div class="row"><button class="link" type="button" id="adv-reset">Restore defaults</button></div>
+            </div>
+          </details>
         </div>
       </div>
     </div>

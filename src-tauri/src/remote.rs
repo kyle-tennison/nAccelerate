@@ -97,23 +97,39 @@ pub async fn run(sh: &SelfHosted, script: &str) -> Result<String, String> {
     output(ssh(sh, script, false)).await
 }
 
+/// Runs `script` with `input` on its stdin.
+pub async fn run_with_input(sh: &SelfHosted, script: &str, input: &str) -> Result<String, String> {
+    use tokio::io::AsyncWriteExt;
+    let mut cmd = ssh(sh, script, false);
+    cmd.stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::piped());
+    let mut child = cmd.spawn().map_err(|e| format!("Could not start ssh: {e}. Is OpenSSH installed?"))?;
+    if let Some(mut stdin) = child.stdin.take() {
+        stdin.write_all(input.as_bytes()).await.map_err(|e| e.to_string())?;
+    }
+    let out = child.wait_with_output().await.map_err(|e| e.to_string())?;
+    if out.status.success() {
+        Ok(String::from_utf8_lossy(&out.stdout).into_owned())
+    } else {
+        Err(String::from_utf8_lossy(&out.stderr).trim().to_string())
+    }
+}
+
+/// The ntop runner the app installs on the server, so the default solve command works without setup.
+pub const RUNNER: &str = include_str!("../resources/ntop-run.py");
+
+pub async fn install_runner(sh: &SelfHosted) -> Result<(), String> {
+    run_with_input(sh, "mkdir -p ~/.naccelerate && cat > ~/.naccelerate/ntop-run.py && chmod +x ~/.naccelerate/ntop-run.py", RUNNER)
+        .await
+        .map(|_| ())
+}
+
 /// Reads core count, memory, GPUs and OS from a Linux host, and checks that the solve command exists.
 pub async fn probe(sh: &SelfHosted) -> Result<HostInfo, String> {
     check(sh)?;
-    let program = sh
-        .command
-        .split_whitespace()
-        .filter(|w| !w.contains('{') && !w.starts_with('-') && !w.contains('='))
-        .find(|w| !w.chars().all(|c| c.is_ascii_digit()) && !["taskset", "sg", "sudo"].contains(w))
-        .unwrap_or("ntop")
-        .to_string();
-    let script = format!(
-        "nproc; awk '/MemTotal/ {{print $2}}' /proc/meminfo; \
+    let script = "nproc; awk '/MemTotal/ {print $2}' /proc/meminfo; \
          (nvidia-smi -L 2>/dev/null | grep -c '^GPU') || true; \
-         uname -sr; command -v {} >/dev/null && echo yes || echo no",
-        shell_quote(&program)
-    );
-    let out = run(sh, &script).await?;
+         uname -sr; command -v python3 >/dev/null && command -v docker >/dev/null && echo yes || echo no";
+    let out = run(sh, script).await?;
     let lines: Vec<&str> = out.lines().map(str::trim).collect();
     let num = |i: usize| lines.get(i).and_then(|l| l.parse::<f64>().ok()).unwrap_or(0.0);
     Ok(HostInfo {

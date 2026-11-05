@@ -5,9 +5,9 @@ import "@fontsource/ibm-plex-mono/400.css";
 import "@fontsource/archivo/800.css";
 import { getBackend } from "./backend";
 import { CORE_HISTORY, ObjectiveChart, drawCores } from "./charts";
-import { countSteps, lineKind, optResult, parseIters, pretty } from "./logparse";
+import { lineKind, optResult, parseIters, pretty, stepEvents, type StepEvent } from "./logparse";
 import { DEFAULT_SETTINGS } from "./mock";
-import type { FolderInfo, Gpu, Phase, Progress, ResourceKey, Resources, Settings, Stats } from "./types";
+import type { Block, FolderInfo, Gpu, Phase, Progress, ResourceKey, Resources, Settings, Stats } from "./types";
 
 const be = getBackend();
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -108,7 +108,7 @@ function render() {
   const up = p === "upload" || p === "download" ? S.upload : null;
   // The main bar counts notebook steps (upload and download use bytes instead); iterations get their own bar while they run.
   const total = S.folder?.steps ?? 0;
-  const steps = p === "solve" && total ? Math.min(total, countSteps(S.log)) : null;
+  const steps = p === "solve" && total ? Math.min(total, ticker.shown) : null;
   const pr = $("prog");
   pr.classList.toggle("indet", live && steps === null && !up);
   (pr.firstChild as HTMLElement).style.width =
@@ -120,9 +120,7 @@ function render() {
   $("obj-wrap").hidden = !iterating || its.length < 2;
   if (iterating && its.length >= 2) objective.draw(its);
 
-  const last = S.log.length ? pretty(S.log[S.log.length - 1]) : { text: S.folder ? "Ready to send" : "Choose a folder to get started", kind: "" };
-  $("latest").className = `msg trunc ${last.kind}`;
-  bind("latest", (e) => (e.textContent = last.text));
+  renderSteps();
   const nErr = S.log.filter((l) => / \[E\]: /.test(l)).length;
   $("errs").hidden = !nErr;
   $("errs").textContent = `${nErr} error${nErr > 1 ? "s" : ""}`;
@@ -154,6 +152,83 @@ function onStats(st: Stats) {
   schedule();
 }
 
+/* Step ticker: shows the step that just finished above the one that is probably running now.
+   The log only reports a block when it finishes, so the running one is inferred from the notebook:
+   the first block, in file order, whose inputs have all finished. When many steps finish at once
+   they are revealed one by one, briefly, so each can be seen. */
+
+const ticker = { shown: 0, active: null as string | null, since: 0, events: [] as StepEvent[], logLen: -1 };
+
+function events(): StepEvent[] {
+  if (ticker.logLen !== S.log.length) { ticker.events = stepEvents(S.log); ticker.logLen = S.log.length; }
+  return ticker.events;
+}
+
+function runningBlock(blocks: Block[], shown: StepEvent[]): string | null {
+  const done = new Set(shown.filter((e) => !e.error).map((e) => e.name));
+  const dead = new Set(shown.filter((e) => e.error).map((e) => e.name));
+  const known = new Set(blocks.map((b) => b.name));
+  for (let changed = true; changed; ) {
+    changed = false;
+    for (const b of blocks) {
+      if (!dead.has(b.name) && b.deps.some((d) => dead.has(d))) { dead.add(b.name); changed = true; }
+    }
+  }
+  const ready = blocks.find((b) => !done.has(b.name) && !dead.has(b.name) && b.deps.every((d) => done.has(d) || !known.has(d)));
+  return ready?.name ?? null;
+}
+
+const short = (ms: number) => (ms < 1000 ? `${ms}ms` : ms < 60000 ? `${(ms / 1000).toFixed(1)}s` : fmt(ms));
+
+function replay(el: HTMLElement) {
+  el.classList.remove("tick");
+  void el.offsetWidth;
+  el.classList.add("tick");
+}
+
+function renderSteps() {
+  const p = S.phase, evs = events();
+  const solving = p === "solve" || (p === "cancelling" && evs.length > 0);
+  const blocks = S.folder?.blocks ?? [];
+  const shown = evs.slice(0, ticker.shown);
+  const active = solving && blocks.length ? runningBlock(blocks, shown) : null;
+  if (active !== ticker.active) { ticker.active = active; ticker.since = Date.now(); }
+
+  const done = $("run-done"), now = $("run-now");
+  const last = shown[shown.length - 1];
+  done.hidden = !solving || !last;
+  if (last) {
+    done.classList.toggle("err", !!last.error);
+    done.querySelector(".nm")!.textContent = last.error ? `${last.name} failed` : last.name;
+    done.querySelector(".t")!.textContent = last.error ? "" : short(last.ms ?? 0);
+    done.title = last.error ?? "";
+  }
+  now.hidden = !active || p === "cancelling";
+  if (active) {
+    now.querySelector(".nm")!.textContent = active;
+    now.querySelector(".t")!.textContent = short(Date.now() - ticker.since).replace(/\.\ds$/, "s");
+  }
+  $("run").hidden = done.hidden && now.hidden;
+
+  // Outside the solve, the latest log line is shown instead.
+  const line = S.log.length ? pretty(S.log[S.log.length - 1]) : { text: S.folder ? "Ready to send" : "Choose a folder to get started", kind: "" };
+  $("latest").parentElement!.hidden = !$("run").hidden;
+  $("latest").className = `msg trunc ${line.kind}`;
+  bind("latest", (e) => (e.textContent = line.text));
+}
+
+function advanceTicker() {
+  const evs = events();
+  if (!running()) { ticker.shown = evs.length; return; }
+  if (ticker.shown >= evs.length) { renderSteps(); return; }
+  const backlog = evs.length - ticker.shown;
+  ticker.shown += backlog > 40 ? Math.ceil(backlog / 20) : 1;
+  const prevActive = ticker.active;
+  renderSteps();
+  replay($("run-done"));
+  if (ticker.active !== prevActive) replay($("run-now"));
+}
+
 function onStatus(p: Phase) {
   if (p !== S.phase) S.upload = null;
   S.phase = p;
@@ -174,6 +249,7 @@ function localLog(level: "I" | "W" | "E", text: string) {
 async function start() {
   if (!S.folder?.notebook) return;
   S.log = []; S.coreHist = []; S.memGb = 0; S.memPeak = 0; S.gpus = []; S.upload = null;
+  ticker.shown = 0; ticker.active = null;
   S.t0 = Date.now(); S.tEnd = 0; S.phase = "queued";
   S.settings.resources = { ...S.req };
   await be.saveSettings(S.settings);
@@ -240,7 +316,7 @@ function formToSettings(): Settings {
     keyPath: input("s-key").value.trim(),
     remoteDir: input("s-dir").value.trim() || DEFAULT_SETTINGS.selfHosted.remoteDir,
     command: input("s-cmd").value.trim() || DEFAULT_SETTINGS.selfHosted.command,
-    cancelCommand: input("s-cancel").value.trim(),
+    cancelCommand: input("s-cancel").value.trim() || DEFAULT_SETTINGS.selfHosted.cancelCommand,
   };
   s.results = { mode: $<HTMLSelectElement>("r-mode").value as "copy" | "replace", notify: s.results.notify, showAllLogs: input("r-logs").checked };
   return s;
@@ -273,6 +349,7 @@ async function fillForm() {
   input("s-dir").value = s.selfHosted.remoteDir;
   input("s-cmd").value = s.selfHosted.command;
   input("s-cancel").value = s.selfHosted.cancelCommand ?? "";
+  $<HTMLDetailsElement>("adv").open = false;
   $<HTMLSelectElement>("r-mode").value = s.results.mode;
   input("r-logs").checked = s.results.showAllLogs;
   $("test-out").hidden = true;
@@ -296,6 +373,13 @@ function status(id: string, ok: boolean, title: string, lines: string[] = []) {
 }
 
 $("gear").addEventListener("click", () => void showSettings(true));
+$("adv-reset").addEventListener("click", () => {
+  const d = DEFAULT_SETTINGS.selfHosted;
+  input("s-dir").value = d.remoteDir;
+  input("s-cmd").value = d.command;
+  input("s-cancel").value = d.cancelCommand;
+  persistSoon();
+});
 $("back").addEventListener("click", () => void showSettings(false));
 document.querySelectorAll<HTMLInputElement | HTMLSelectElement>("#v-set input:not(#n-pass), #v-set select").forEach((el) => {
   el.addEventListener("input", persistSoon);
@@ -344,6 +428,7 @@ async function init() {
   S.req = S.settings.resources ?? (L ? { cpu: L.cpu, mem: L.mem, gpu: 0 } : { ...S.req });
   render();
   window.setInterval(() => { if (running()) render(); }, 1000);
+  window.setInterval(advanceTicker, 110);
   window.addEventListener("resize", schedule);
 }
 

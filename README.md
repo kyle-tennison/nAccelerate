@@ -15,7 +15,7 @@ The system OpenSSH client is used, so the server must accept key-based login (no
 
 ## Step count
 
-When a folder is chosen, the app reads the notebook's block list straight from the `.ntop` file ([`notebook.rs`](src-tauri/src/notebook.rs)) to know how many steps the run should log. The solver bar then advances by one for each `… complete Nms` or `[E]: <block>: …` line, and a second bar tracks iterations while an optimization runs. The count assumes every block succeeds; a failed block skips its dependents, so a run with errors finishes short of the total. The `.ntop` layout is undocumented, so if the file doesn't match what's expected the bar falls back to an indeterminate one.
+When a folder is chosen, the app reads the notebook's block list straight from the `.ntop` file ([`notebook.rs`](src-tauri/src/notebook.rs)) to know how many steps the run should log and how the blocks depend on each other. The solver bar then advances by one for each `… complete Nms` or `[E]: <block>: …` line, and a second bar tracks iterations while an optimization runs. Under the bar, the step that just finished sits above the one running now. The log only reports blocks when they finish, so the running one is inferred as the first block whose inputs have all finished; when many steps finish at once they are shown one after another. The count assumes every block succeeds; a failed block skips its dependents, so a run with errors finishes short of the total. The `.ntop` layout is undocumented, so if the file doesn't match what's expected the bar falls back to an indeterminate one.
 
 To check the count for a notebook:
 
@@ -23,9 +23,11 @@ To check the count for a notebook:
 cd src-tauri && cargo run --example count_steps -- path/to/notebook.ntop
 ```
 
-## Server wrapper
+## Server runner
 
-[`server/ntop`](server/ntop) is a wrapper that runs `ntopcl` in Docker. Put it on the server's `PATH` and set `IMAGE`. It names the container after `NACCEL_JOB` and applies `--cpuset-cpus`, `--memory` and `--gpus` from the resources chosen in the widget. Note that `ntopcl` takes the password as `-w`, so it is visible in the server's process list while a solve runs.
+Before each job the app installs [`ntop-run.py`](src-tauri/resources/ntop-run.py) to `~/.naccelerate/` on the server, and the default solve command runs it. It needs Python 3 and Docker on the server (Test connection checks for both). It runs `ntopcl` in the nTop Docker image (found automatically, or set `NTOP_IMAGE`), uses `sg docker` when the shell isn't in the docker group yet, names the container after the job so cancel can remove it, and applies `--cpuset-cpus`, `--memory` and `--gpus` from the resources chosen in the widget. `ntopcl` takes the password as `-w`, so it is visible in the server's process list while a solve runs.
+
+The remote job folder, solve command and cancel command can be changed under Advanced in Settings.
 
 ## Development
 
