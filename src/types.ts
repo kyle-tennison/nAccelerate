@@ -70,6 +70,8 @@ export interface Backend {
   savePassword(user: string, password: string): Promise<void>;
   hasPassword(user: string): Promise<boolean>;
   pickFolder(): Promise<FolderInfo | null>;
+  /** Calls `hover` while something is dragged over the window and `drop` with the folder that was dropped. */
+  onFolderDrop(hover: (over: boolean) => void, drop: (folder: FolderInfo) => void): void;
   startJob(request: JobRequest): Promise<void>;
   cancelJob(): Promise<void>;
   listen(handlers: Handlers): Promise<void>;

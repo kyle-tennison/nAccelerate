@@ -429,6 +429,10 @@ label.btn input[type="file"] {
   padding: 8px 10px;
   min-width: 0;
 }
+.folder.over {
+  border-color: var(--viz);
+  background: color-mix(in oklab, var(--viz) 12%, transparent);
+}
 .folder > svg.bi {
   font-size: 18px;
   color: var(--ink-2);
