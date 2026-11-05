@@ -11,9 +11,17 @@
         "decorations": true,
         "titleBarStyle": "Overlay",
         "hiddenTitle": true,
-        "trafficLightPosition": { "x": 14, "y": 14 },
+        "trafficLightPosition": {
+          "x": 14,
+          "y": 14
+        },
         "resizable": true
       }
     ]
+  },
+  "bundle": {
+    "macOS": {
+      "signingIdentity": "-"
+    }
   }
 }
