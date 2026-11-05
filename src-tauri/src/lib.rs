@@ -76,9 +76,10 @@ fn start_job(app: AppHandle, state: State<JobState>, request: job::JobRequest) -
     if slot.as_ref().is_some_and(|tx| !tx.is_closed()) {
         return Err("A job is already running.".into());
     }
+    let password = keyring::Entry::new(KEYRING_SERVICE, &settings.ntop_user).and_then(|e| e.get_password()).ok();
     let (tx, rx) = watch::channel(false);
     *slot = Some(tx);
-    tauri::async_runtime::spawn(job::run(app, settings, request, rx));
+    tauri::async_runtime::spawn(job::run(app, settings, request, password, rx));
     Ok(())
 }
 

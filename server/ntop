@@ -1,0 +1,57 @@
+#!/usr/bin/env python3
+"""Run and save the .ntop notebook in a directory, inside the nTop Docker image.
+
+nAccelerate runs this on the server as `ntop --input <folder>`. It passes the login and the
+requested resources as environment variables; when they are missing (running by hand), the
+constants below are used and the container is not limited.
+"""
+import argparse
+import os
+import shlex
+import subprocess
+import sys
+import time
+from pathlib import Path
+
+IMAGE = "ntop:latest"
+EMAIL = ""
+PASSWORD = ""
+UNIX_USER = os.environ.get("USER", "ntop")
+
+parser = argparse.ArgumentParser(description="Run and save the .ntop notebook in a directory.")
+parser.add_argument("--input", "-i", required=True, help="directory containing one .ntop file")
+work = Path(parser.parse_args().input).resolve()
+notebooks = list(work.glob("*.ntop"))
+if len(notebooks) != 1:
+    sys.exit(f"Expected exactly one .ntop file in {work}, found {len(notebooks)}")
+notebook = notebooks[0]
+
+env = os.environ
+email = env.get("NTOP_EMAIL") or EMAIL
+password = env.get("NTOP_PASSWORD") or PASSWORD
+
+limits = []
+if env.get("NACCEL_JOB"):
+    limits += ["--name", env["NACCEL_JOB"]]
+if env.get("NACCEL_CPUSET"):
+    limits += ["--cpuset-cpus", env["NACCEL_CPUSET"]]
+if env.get("NACCEL_MEM_GB"):
+    limits += ["--memory", f"{env['NACCEL_MEM_GB']}g"]
+if int(env.get("NACCEL_GPUS") or 0) > 0:
+    limits += ["--gpus", env["NACCEL_GPUS"]]
+
+log_name = f"ntopcl_{time.strftime('%Y%m%d_%H%M%S')}.log"
+print(f"Log: {work / log_name}", flush=True)
+
+cmd = [
+    "docker", "run", "--rm", *limits,
+    "-e", f"USER={UNIX_USER}", "-e", f"LOGNAME={UNIX_USER}",  # --save segfaults without these
+    "-v", f"{work}:/work", "-w", "/work",
+    IMAGE,
+    "ntopcl", "-u", email, "-w", password, "-v", "2", "-s",
+    f"--logfile={log_name}", notebook.name,
+]
+# The shell isn't in the docker group yet, so run through sg.
+result = subprocess.run(["sg", "docker", "-c", shlex.join(cmd)], stdin=subprocess.DEVNULL)
+print(f"Saved: {notebook}" if result.returncode == 0 else f"ntopcl failed (exit {result.returncode})", flush=True)
+sys.exit(result.returncode)

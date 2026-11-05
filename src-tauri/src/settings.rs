@@ -28,6 +28,7 @@ pub struct SelfHosted {
     pub key_path: String,
     pub remote_dir: String,
     pub command: String,
+    pub cancel_command: String,
 }
 
 impl Default for SelfHosted {
@@ -38,7 +39,8 @@ impl Default for SelfHosted {
             user: String::new(),
             key_path: String::new(),
             remote_dir: "~/naccelerate/jobs".into(),
-            command: "taskset -c 0-{cpu_last} ntop --input {folder}".into(),
+            command: "ntop --input {folder}".into(),
+            cancel_command: "sg docker -c 'docker rm -f {job}'".into(),
         }
     }
 }

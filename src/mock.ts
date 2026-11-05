@@ -7,7 +7,7 @@ const TICK_MS = 700;
 export const DEFAULT_SETTINGS: Settings = {
   provider: "self",
   ntopUser: "",
-  selfHosted: { host: "", port: 22, user: "", keyPath: "", remoteDir: "~/naccelerate/jobs", command: "taskset -c 0-{cpu_last} ntop --input {folder}" },
+  selfHosted: { host: "", port: 22, user: "", keyPath: "", remoteDir: "~/naccelerate/jobs", command: "ntop --input {folder}", cancelCommand: "sg docker -c 'docker rm -f {job}'" },
   aws: { region: "us-east-2", profile: "default", spendCap: "$25.00", spot: false, terminate: true },
   results: { mode: "copy", notify: true, showAllLogs: false },
   hostInfo: null,

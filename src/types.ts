@@ -13,7 +13,7 @@ export interface HostInfo {
 export interface Settings {
   provider: "self" | "aws";
   ntopUser: string;
-  selfHosted: { host: string; port: number; user: string; keyPath: string; remoteDir: string; command: string };
+  selfHosted: { host: string; port: number; user: string; keyPath: string; remoteDir: string; command: string; cancelCommand: string };
   aws: { region: string; profile: string; spendCap: string; spot: boolean; terminate: boolean };
   results: { mode: "copy" | "replace"; notify: boolean; showAllLogs: boolean };
   hostInfo: HostInfo | null;

@@ -73,7 +73,7 @@
           <div class="sec">
             <div class="sec-h">nTop account</div>
             <label class="field"><span>Username</span><input id="n-user" autocomplete="username" placeholder="you@example.com"></label>
-            <label class="field"><span>Password</span><input id="n-pass" type="password" autocomplete="current-password" placeholder="Saved in your system keychain"></label>
+            <label class="field"><span>Password</span><input id="n-pass" type="password" autocomplete="current-password"></label>
             <div class="row"><button class="btn" type="button" id="signin">Save login</button><span class="xs dim">Used to check out an nTop license on the remote machine.</span></div>
             <div class="status" id="signin-out" hidden></div>
           </div>
@@ -97,7 +97,9 @@
             <label class="field"><span>SSH key</span><input id="s-key" placeholder="~/.ssh/id_ed25519" spellcheck="false"></label>
             <label class="field"><span>Remote job folder</span><input id="s-dir" placeholder="~/naccelerate/jobs" spellcheck="false"></label>
             <label class="field"><span>Solve command</span><input id="s-cmd" spellcheck="false"></label>
-            <span class="xs dim">Runs inside the uploaded job folder. {folder}, {cpus}, {cpu_last} and {mem_gb} are filled in.</span>
+            <span class="xs dim">Runs in the job folder and must print "Saved: &lt;path&gt;". It gets NTOP_EMAIL, NTOP_PASSWORD, NACCEL_JOB, NACCEL_CPUS, NACCEL_CPUSET, NACCEL_MEM_GB and NACCEL_GPUS.</span>
+            <label class="field"><span>Cancel command</span><input id="s-cancel" spellcheck="false"></label>
+            <span class="xs dim">Runs after the solver's processes are killed, for cleanup such as stopping its container. {job} is the job name.</span>
             <div class="row"><button class="btn" type="button" id="test">Test connection</button></div>
             <div class="status" id="test-out" hidden></div>
           </div>

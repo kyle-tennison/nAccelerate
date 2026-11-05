@@ -224,6 +224,7 @@ function formToSettings(): Settings {
     keyPath: input("s-key").value.trim(),
     remoteDir: input("s-dir").value.trim() || DEFAULT_SETTINGS.selfHosted.remoteDir,
     command: input("s-cmd").value.trim() || DEFAULT_SETTINGS.selfHosted.command,
+    cancelCommand: input("s-cancel").value.trim(),
   };
   s.results = { mode: $<HTMLSelectElement>("r-mode").value as "copy" | "replace", notify: s.results.notify, showAllLogs: input("r-logs").checked };
   if (S.pendingHost) s.hostInfo = S.pendingHost;
@@ -235,13 +236,14 @@ async function fillForm() {
   input("prov-self").checked = true;
   input("n-user").value = s.ntopUser;
   input("n-pass").value = "";
-  input("n-pass").placeholder = s.ntopUser && (await be.hasPassword(s.ntopUser)) ? "Saved in your system keychain" : "";
+  input("n-pass").placeholder = s.ntopUser && (await be.hasPassword(s.ntopUser)) ? "Saved" : "";
   input("s-host").value = s.selfHosted.host;
   input("s-port").value = String(s.selfHosted.port);
   input("s-user").value = s.selfHosted.user;
   input("s-key").value = s.selfHosted.keyPath;
   input("s-dir").value = s.selfHosted.remoteDir;
   input("s-cmd").value = s.selfHosted.command;
+  input("s-cancel").value = s.selfHosted.cancelCommand ?? "";
   $<HTMLSelectElement>("r-mode").value = s.results.mode;
   input("r-logs").checked = s.results.showAllLogs;
   S.pendingHost = null;
@@ -299,7 +301,7 @@ $("signin").addEventListener("click", async () => {
   try {
     await be.savePassword(user, pass);
     input("n-pass").value = "";
-    input("n-pass").placeholder = "Saved in your system keychain";
+    input("n-pass").placeholder = "Saved";
     status("signin-out", true, `Saved login for ${user}`);
   } catch (e) {
     status("signin-out", false, "Could not save the password", [String(e)]);

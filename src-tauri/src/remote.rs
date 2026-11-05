@@ -66,8 +66,7 @@ fn common_opts(cmd: &mut Command, sh: &SelfHosted) {
     }
 }
 
-/// An `ssh` command that runs `script` on the remote host. A pseudo-terminal makes the remote solver
-/// line-buffer its output, and closing the connection hangs it up, which is how cancel stops it.
+/// An `ssh` command that runs `script` on the remote host, optionally with a pseudo-terminal.
 pub fn ssh(sh: &SelfHosted, script: &str, tty: bool) -> Command {
     let mut cmd = Command::new("ssh");
     cmd.arg("-p").arg(sh.port.to_string());
@@ -79,11 +78,11 @@ pub fn ssh(sh: &SelfHosted, script: &str, tty: bool) -> Command {
     cmd
 }
 
-pub fn scp(sh: &SelfHosted, from: &str, to: &str) -> Command {
+pub fn scp(sh: &SelfHosted, from: &[String], to: &str) -> Command {
     let mut cmd = Command::new("scp");
     cmd.arg("-P").arg(sh.port.to_string()).arg("-r");
     common_opts(&mut cmd, sh);
-    cmd.arg(from).arg(to);
+    cmd.args(from).arg(to);
     cmd
 }
 
@@ -118,7 +117,7 @@ pub async fn probe(sh: &SelfHosted) -> Result<HostInfo, String> {
         .command
         .split_whitespace()
         .filter(|w| !w.contains('{') && !w.starts_with('-') && !w.contains('='))
-        .find(|w| !w.chars().all(|c| c.is_ascii_digit()) && *w != "taskset")
+        .find(|w| !w.chars().all(|c| c.is_ascii_digit()) && !["taskset", "sg", "sudo"].contains(w))
         .unwrap_or("ntop")
         .to_string();
     let script = format!(
