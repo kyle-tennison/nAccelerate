@@ -20,7 +20,7 @@
   --close-ink: #ffffff;
   --sans: "Figtree", system-ui, sans-serif;
   --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
-  --brand: "Bricolage Grotesque", "Arial Black", system-ui, sans-serif;
+  --brand: "Barlow Condensed", "Arial Narrow", system-ui, sans-serif;
   color-scheme: dark;
 }
 
@@ -63,8 +63,8 @@ svg.bi {
   gap: 0.42em;
   color: var(--ink);
   font-family: var(--brand);
-  font-weight: 800;
-  letter-spacing: -0.02em;
+  font-weight: 700;
+  letter-spacing: 0;
   line-height: 1;
 }
 .logo svg {
@@ -285,7 +285,7 @@ label.btn input[type="file"] {
   user-select: none;
 }
 .w-head .logo {
-  font-size: 12.5px;
+  font-size: 15px;
 }
 .w-head .t {
   font-size: 12px;
