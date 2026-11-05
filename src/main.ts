@@ -7,7 +7,7 @@ import { getBackend } from "./backend";
 import { CORE_HISTORY, ObjectiveChart, drawCores } from "./charts";
 import { lineKind, optResult, parseIters, pretty } from "./logparse";
 import { DEFAULT_SETTINGS } from "./mock";
-import type { FolderInfo, Gpu, HostInfo, Phase, ResourceKey, Resources, Settings, Stats } from "./types";
+import type { FolderInfo, Gpu, Phase, ResourceKey, Resources, Settings, Stats } from "./types";
 
 const be = getBackend();
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -33,7 +33,6 @@ const S = {
   showAll: false,
   t0: 0,
   tEnd: 0,
-  pendingHost: null as HostInfo | null,
 };
 
 const running = () => RUNNING.includes(S.phase);
@@ -211,7 +210,7 @@ document.querySelectorAll<HTMLElement>(".step").forEach((step) => {
   field.addEventListener("blur", () => close(true));
 });
 
-/* Settings */
+/* Settings save as they change; the password goes to the system keychain when its field loses focus. */
 
 function formToSettings(): Settings {
   const s = structuredClone(S.settings);
@@ -227,8 +226,21 @@ function formToSettings(): Settings {
     cancelCommand: input("s-cancel").value.trim(),
   };
   s.results = { mode: $<HTMLSelectElement>("r-mode").value as "copy" | "replace", notify: s.results.notify, showAllLogs: input("r-logs").checked };
-  if (S.pendingHost) s.hostInfo = S.pendingHost;
   return s;
+}
+
+let saveTimer: number | undefined;
+async function persist() {
+  window.clearTimeout(saveTimer);
+  const before = S.settings.selfHosted.host;
+  S.settings = formToSettings();
+  if (S.settings.selfHosted.host !== before) S.settings.hostInfo = null;
+  S.showAll = S.settings.results.showAllLogs;
+  await be.saveSettings(S.settings);
+}
+function persistSoon() {
+  window.clearTimeout(saveTimer);
+  saveTimer = window.setTimeout(() => void persist(), 400);
 }
 
 async function fillForm() {
@@ -246,12 +258,12 @@ async function fillForm() {
   input("s-cancel").value = s.selfHosted.cancelCommand ?? "";
   $<HTMLSelectElement>("r-mode").value = s.results.mode;
   input("r-logs").checked = s.results.showAllLogs;
-  S.pendingHost = null;
   $("test-out").hidden = true;
   $("signin-out").hidden = true;
 }
 
-function showSettings(on: boolean) {
+async function showSettings(on: boolean) {
+  if (!on) await persist();
   $("v-main").hidden = on; $("v-set").hidden = !on;
   $("head-logo").hidden = on; $("head-title").hidden = !on;
   $("head-chip").hidden = on; $("back").hidden = !on; $("gear").hidden = on;
@@ -266,26 +278,24 @@ function status(id: string, ok: boolean, title: string, lines: string[] = []) {
   el.innerHTML = `<b>${esc(title)}</b>${lines.map((l) => `<span>${esc(l)}</span>`).join("")}`;
 }
 
-$("gear").addEventListener("click", () => showSettings(true));
-$("back").addEventListener("click", () => showSettings(false));
-$("set-cancel").addEventListener("click", () => showSettings(false));
-$("set-save").addEventListener("click", async () => {
-  S.settings = formToSettings();
-  S.showAll = S.settings.results.showAllLogs;
-  const L = limits();
-  if (L && !S.settings.resources) S.req = { cpu: L.cpu, mem: L.mem, gpu: 0 };
-  await be.saveSettings(S.settings);
-  showSettings(false);
+$("gear").addEventListener("click", () => void showSettings(true));
+$("back").addEventListener("click", () => void showSettings(false));
+document.querySelectorAll<HTMLInputElement | HTMLSelectElement>("#v-set input:not(#n-pass), #v-set select").forEach((el) => {
+  el.addEventListener("input", persistSoon);
+  el.addEventListener("change", persistSoon);
 });
 $("test").addEventListener("click", async () => {
   const btn = $<HTMLButtonElement>("test");
   btn.disabled = true; btn.textContent = "Testing…";
   try {
-    const s = formToSettings();
-    const h = await be.testConnection(s);
-    S.pendingHost = h;
-    const who = s.selfHosted.user ? `${s.selfHosted.user}@${s.selfHosted.host}` : s.selfHosted.host;
-    status("test-out", true, `Connected to ${who}`, [
+    await persist();
+    const sh = S.settings.selfHosted;
+    const h = await be.testConnection(S.settings);
+    const hadLimits = !!limits();
+    S.settings.hostInfo = h;
+    if (!hadLimits && !S.settings.resources) S.req = { cpu: h.cores, mem: Math.floor(h.memGb), gpu: 0 };
+    await be.saveSettings(S.settings);
+    status("test-out", true, `Connected to ${sh.user ? `${sh.user}@${sh.host}` : sh.host}`, [
       `${h.os}${h.ntopFound ? " · solver found" : " · solver command not found"}`,
       `${h.cores} cores · ${h.memGb.toFixed(0)} GB · ${h.gpus ? `${h.gpus} GPU${h.gpus > 1 ? "s" : ""}` : "no GPU"}`,
     ]);
@@ -295,14 +305,15 @@ $("test").addEventListener("click", async () => {
     btn.disabled = false; btn.textContent = "Test connection";
   }
 });
-$("signin").addEventListener("click", async () => {
+$("n-pass").addEventListener("change", async () => {
   const user = input("n-user").value.trim(), pass = input("n-pass").value;
-  if (!user || !pass) { status("signin-out", false, "Enter a username and password"); return; }
+  if (!pass) return;
+  if (!user) { status("signin-out", false, "Enter your username first"); return; }
   try {
     await be.savePassword(user, pass);
     input("n-pass").value = "";
     input("n-pass").placeholder = "Saved";
-    status("signin-out", true, `Saved login for ${user}`);
+    $("signin-out").hidden = true;
   } catch (e) {
     status("signin-out", false, "Could not save the password", [String(e)]);
   }
