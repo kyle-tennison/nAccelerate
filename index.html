@@ -59,7 +59,10 @@
               <canvas class="obj" id="obj" aria-label="Objective (log scale) and max change over time"></canvas>
               <div class="tip" id="tip" hidden></div>
             </div>
-            <div class="run" id="run" hidden><div class="run-list" id="run-list"></div></div>
+            <div class="run" id="run" hidden>
+              <div class="run-row now" id="run-now" hidden><i class="spin"></i><span class="nm trunc"></span><span class="t num"></span></div>
+              <div class="run-feed"><div class="run-list" id="run-list"></div></div>
+            </div>
             <div class="latest"><span class="msg trunc" data-bind="latest" id="latest"></span></div>
             <div class="log" id="log" hidden aria-live="polite"></div>
           </div>

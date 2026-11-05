@@ -189,18 +189,21 @@ canvas.obj { width: 100%; height: 76px; display: block; cursor: crosshair }
 .adv[open] > summary::before { transform: rotate(45deg) }
 .adv > .sec { margin-top: 10px }
 
-/* Solver step feed: rows are bottom-anchored, so new rows push older ones up into the fade. */
-.run { height: 80px; overflow: hidden; display: flex; flex-direction: column; justify-content: flex-end;
-  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 55%); mask-image: linear-gradient(to bottom, transparent, #000 55%) }
-.run-list { display: flex; flex-direction: column; transition: transform .26s cubic-bezier(.2, .7, .2, 1); will-change: transform }
+/* Solver step feed: the running step stays put on top; finished steps enter just below it and slide down into the fade. */
+.run { display: grid; gap: 2px }
+.run-feed { height: 80px; overflow: hidden;
+  -webkit-mask-image: linear-gradient(to bottom, #000 40%, transparent); mask-image: linear-gradient(to bottom, #000 40%, transparent) }
+.run-list { display: flex; flex-direction: column; transition: transform .18s cubic-bezier(.2, .7, .2, 1); will-change: transform }
 .run-row { height: 20px; flex: none; display: flex; align-items: center; gap: 8px; font-size: 12.5px; min-width: 0 }
 .run-row .ic, .run-row .spin { width: 10px; height: 10px; flex: none }
 .run-row .spin { color: var(--viz) }
-.run-row.done { color: var(--ink-2); transition: color .3s }
+.run-row.done { color: var(--ink-2) }
 .run-row.err { color: var(--bad) }
 .run-row .nm { flex: 1 }
 .run-row .t { flex: none; color: var(--ink-2); font-size: 11.5px }
-@media (prefers-reduced-motion: reduce) { .run-list { transition: none } }
+.run-row.now .nm.swap { animation: swap .16s ease-out }
+@keyframes swap { from { opacity: .35 } }
+@media (prefers-reduced-motion: reduce) { .run-list { transition: none } .run-row.now .nm.swap { animation: none } }
 .live canvas, .live .meter { transition: filter .3s, opacity .3s }
 .w.offline .live canvas, .w.offline .live .meter { filter: grayscale(1); opacity: .4 }
 .w.offline .live .sec-h .aside { color: var(--ink-2) }

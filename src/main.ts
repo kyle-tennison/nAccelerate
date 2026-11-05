@@ -153,13 +153,14 @@ function onStats(st: Stats) {
   schedule();
 }
 
-/* Step feed: finished steps stack upward and fade out, with the step that is probably running at the bottom.
-   The log only reports a block when it finishes, so the running one is inferred from the notebook:
-   the first block, in file order, whose inputs have all finished. When many steps finish at once
-   they are revealed one by one, and the list keeps gliding up instead of jumping. */
+/* Step feed: the step that is probably running stays fixed on top, and finished steps enter just below it,
+   pushing older ones down into a fade. The log only reports a block when it finishes, so the running one is
+   inferred from the notebook: the first block, in file order, whose inputs have all finished. When many steps
+   finish at once they are revealed quickly one after another, and the list keeps sliding instead of jumping. */
 
 const ROW_H = 20;
-const KEEP_DONE = 4;
+const KEEP_DONE = 5;
+const REVEAL_MS = 45;
 const ticker = { shown: 0, rendered: 0, active: null as string | null, since: 0, events: [] as StepEvent[], logLen: -1 };
 
 function events(): StepEvent[] {
@@ -183,63 +184,57 @@ function runningBlock(blocks: Block[], shown: StepEvent[]): string | null {
 
 const short = (ms: number) => (ms < 1000 ? `${ms}ms` : ms < 60000 ? `${(ms / 1000).toFixed(1)}s` : fmt(ms));
 
-function row(cls: string, name: string, time: string, title = "") {
+function doneRow(e: StepEvent) {
   const el = document.createElement("div");
-  el.className = `run-row ${cls}`;
-  el.dataset.name = name;
-  el.title = title;
-  el.innerHTML = `<i class="${cls === "now" ? "spin" : "ic"}"></i><span class="nm trunc"></span><span class="t num"></span>`;
-  el.querySelector(".nm")!.textContent = name;
-  el.querySelector(".t")!.textContent = time;
+  el.className = `run-row done${e.error ? " err" : ""}`;
+  el.title = e.error ?? "";
+  el.innerHTML = `<i class="ic"></i><span class="nm trunc"></span><span class="t num"></span>`;
+  el.querySelector(".nm")!.textContent = e.error ? `${e.name} failed` : e.name;
+  el.querySelector(".t")!.textContent = e.error ? "" : short(e.ms ?? 0);
   return el;
 }
 
-function finish(el: HTMLElement, e: StepEvent) {
-  el.className = `run-row done${e.error ? " err" : ""}`;
-  el.title = e.error ?? "";
-  el.querySelector(".spin")?.setAttribute("class", "ic");
-  el.querySelector(".nm")!.textContent = e.error ? `${e.name} failed` : e.name;
-  el.querySelector(".t")!.textContent = e.error ? "" : short(e.ms ?? 0);
-}
-
-// Pushes the list down by the rows just added, then lets it ease back to rest, continuing any slide already in flight.
+// Lifts the list by the rows just added on top, then lets it ease back down, continuing any slide already in flight.
 function glide(list: HTMLElement, rows: number) {
   if (!rows) return;
   const current = new DOMMatrixReadOnly(getComputedStyle(list).transform).m42;
   list.style.transition = "none";
-  list.style.transform = `translateY(${current + rows * ROW_H}px)`;
+  list.style.transform = `translateY(${current - rows * ROW_H}px)`;
   void list.offsetHeight;
   list.style.transition = "";
   list.style.transform = "translateY(0)";
 }
 
 function renderSteps() {
-  const p = S.phase, evs = events(), list = $("run-list");
+  const p = S.phase, evs = events(), list = $("run-list"), now = $("run-now");
   const solving = p === "solve" || (p === "cancelling" && evs.length > 0);
   const blocks = S.folder?.blocks ?? [];
 
-  if (!solving || (!blocks.length && ticker.shown === 0)) {
-    if (list.childElementCount) { list.replaceChildren(); ticker.rendered = 0; }
+  if (!solving) {
+    if (list.childElementCount) list.replaceChildren();
+    ticker.rendered = 0;
+    now.hidden = true;
   } else {
     let added = 0;
     while (ticker.rendered < ticker.shown && ticker.rendered < evs.length) {
-      const e = evs[ticker.rendered++];
-      const now = list.querySelector<HTMLElement>(".run-row.now");
-      if (now && now.dataset.name === e.name) finish(now, e);
-      else { const el = row("done", e.name, ""); finish(el, e); list.insertBefore(el, now); added++; }
+      list.prepend(doneRow(evs[ticker.rendered++]));
+      added++;
     }
-    const active = p === "solve" && blocks.length ? runningBlock(blocks, evs.slice(0, ticker.shown)) : null;
-    let now = list.querySelector<HTMLElement>(".run-row.now");
-    if (active !== ticker.active) { ticker.active = active; ticker.since = Date.now(); }
-    if (!active) now?.remove();
-    else if (now) { now.dataset.name = active; now.querySelector(".nm")!.textContent = active; }
-    else { now = row("now", active, ""); list.append(now); added++; }
-    if (active && now) { const ms = Date.now() - ticker.since; now.querySelector(".t")!.textContent = ms < 60000 ? `${Math.floor(ms / 1000)}s` : fmt(ms); }
-    const done = list.querySelectorAll(".run-row.done");
-    for (let i = 0; i < done.length - KEEP_DONE; i++) done[i].remove();
+    const rows = list.querySelectorAll(".run-row");
+    for (let i = KEEP_DONE; i < rows.length; i++) rows[i].remove();
     glide(list, added);
+
+    const active = p === "solve" && blocks.length ? runningBlock(blocks, evs.slice(0, ticker.shown)) : null;
+    const nm = now.querySelector<HTMLElement>(".nm")!;
+    if (active !== ticker.active) {
+      ticker.active = active;
+      ticker.since = Date.now();
+      if (active) { nm.textContent = active; nm.classList.remove("swap"); void nm.offsetWidth; nm.classList.add("swap"); }
+    }
+    now.hidden = !active;
+    if (active) { const ms = Date.now() - ticker.since; now.querySelector(".t")!.textContent = ms < 60000 ? `${Math.floor(ms / 1000)}s` : fmt(ms); }
   }
-  $("run").hidden = !list.childElementCount;
+  $("run").hidden = now.hidden && !list.childElementCount;
 
   // Outside the solve, the latest log line is shown instead.
   const line = S.log.length ? pretty(S.log[S.log.length - 1]) : { text: S.folder ? "Ready to send" : "Choose a folder to get started", kind: "" };
@@ -253,7 +248,7 @@ function advanceTicker() {
   if (!running()) { ticker.shown = evs.length; return; }
   if (ticker.shown < evs.length) {
     const backlog = evs.length - ticker.shown;
-    ticker.shown += backlog > 40 ? Math.ceil(backlog / 20) : 1;
+    ticker.shown += backlog > 12 ? Math.ceil(backlog / 6) : 1;
   }
   renderSteps();
 }
@@ -461,7 +456,7 @@ async function init() {
   S.req = S.settings.resources ?? (L ? { cpu: L.cpu, mem: L.mem, gpu: 0 } : { ...S.req });
   render();
   window.setInterval(() => { if (running()) render(); }, 1000);
-  window.setInterval(advanceTicker, 110);
+  window.setInterval(advanceTicker, REVEAL_MS);
   window.addEventListener("resize", schedule);
 }
 
