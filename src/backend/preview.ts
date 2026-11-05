@@ -66,6 +66,20 @@ export class PreviewBackend implements Backend {
     this.h = h;
   }
 
+  // Browsers don't expose dropped folder paths, so the preview treats any drop as the sample folder.
+  onFolderDrop(hover: (over: boolean) => void, drop: (folder: FolderInfo) => void) {
+    window.addEventListener("dragover", (e) => {
+      e.preventDefault();
+      hover(true);
+    });
+    window.addEventListener("dragleave", () => hover(false));
+    window.addEventListener("drop", async (e) => {
+      e.preventDefault();
+      hover(false);
+      drop(await this.pickFolder());
+    });
+  }
+
   startResize() {}
   minimize() {}
   close() {}
