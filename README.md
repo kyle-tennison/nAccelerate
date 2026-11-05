@@ -1,72 +1,59 @@
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="assets/logo-dark.svg">
-  <img alt="nAccelerate" src="assets/logo.svg" height="64">
-</picture>
+<img alt="nAccelerate" src="assets/logo.svg" height="64">
 
+nAccelerate runs your nTop notebooks on a bigger computer. You pick a project folder, and it copies the folder to your server, solves the notebook there and saves the result next to the original. While it runs you can watch the server's CPU and memory use, follow each step of the notebook, and see the objective converge during a topology optimization.
 
-A small desktop widget (Tauri) that sends an nTop project folder to a more powerful machine, runs the solve there, streams the log and the machine's CPU/memory/GPU usage, and brings the solved notebook back.
+AWS support is planned but not available yet, so for now you need your own server.
 
-## How it works
+## What you need
 
-1. Settings holds the nTop login (the password lives in the system keychain) and a self-hosted server: host, port, user, SSH key, remote job folder, solve command and cancel command. AWS is not available yet.
-2. Send & solve streams the chosen folder to a fresh job folder on the server as a tar archive over ssh, so the upload has a real progress bar. Other `.ntop` files in the folder, such as earlier `_solved` copies, are left out because the solver expects exactly one notebook.
-3. The solve command runs over `ssh` inside the job folder (default `ntop --input {folder}`). It receives `NTOP_EMAIL`, `NTOP_PASSWORD` (sent over stdin, not on the command line), `NACCEL_JOB`, `NACCEL_CPUS`, `NACCEL_CPUSET`, `NACCEL_MEM_GB` and `NACCEL_GPUS`. `{folder}`, `{job}`, `{cpus}`, `{cpu_last}`, `{mem_gb}` and `{gpus}` in the command are also filled in.
-4. A second ssh connection streams `/proc/stat`, `/proc/meminfo` and `nvidia-smi` once a second for the CPU tiles, memory bar and GPU meters. The first `NACCEL_CPUS` cores are shown, so pin the solver to `NACCEL_CPUSET`.
-5. When the solver prints `Saved: <path>`, that file is downloaded over ssh with a progress bar next to the local notebook (as `<name>_solved.ntop`, or replacing it), the remote job folder is removed and the connection is closed.
-6. Cancel shows a Cancelling state while it terminates the remote process group (killing it after 10 s), runs the cancel command (default `sg docker -c 'docker rm -f {job}'`, since closing ssh does not stop a Docker container), confirms the processes are gone, removes the remote job folder and only then disconnects.
+On the server:
 
-The system OpenSSH client is used, so the server must accept key-based login (no password prompts). The server is assumed to be Linux.
+- Linux, reachable over SSH with a key (password logins aren't supported)
+- Docker, with an nTop image pulled
+- Python 3
 
-## Step count
+You also need an nTop account, since every solve signs in to nTop on the server.
 
-When a folder is chosen, the app reads the notebook's block list straight from the `.ntop` file ([`notebook.rs`](src-tauri/src/notebook.rs)) to know how many steps the run should log and how the blocks depend on each other. The solver bar then advances by one for each `… complete Nms` or `[E]: <block>: …` line, and a second bar tracks iterations while an optimization runs. Under the bar, the step running now stays fixed on top, and finished steps enter just below it and slide down into a fade. The log only reports blocks when they finish, so the running one is inferred as the first block whose inputs have all finished; when many steps finish at once they are shown one after another. The count assumes every block succeeds; a failed block skips its dependents, so a run with errors finishes short of the total. The `.ntop` layout is undocumented, so if the file doesn't match what's expected the bar falls back to an indeterminate one.
+## Installing
 
-To check the count for a notebook:
-
-```bash
-cd src-tauri && cargo run --example count_steps -- path/to/notebook.ntop
-```
-
-## Server runner
-
-Before each job the app installs [`ntop-run.py`](src-tauri/resources/ntop-run.py) to `~/.naccelerate/` on the server, and the default solve command runs it. It needs Python 3 and Docker on the server (Test connection checks for both). It runs `ntopcl` in the nTop Docker image (found automatically, or set `NTOP_IMAGE`), uses `sg docker` when the shell isn't in the docker group yet, names the container after the job so cancel can remove it, and applies `--cpuset-cpus`, `--memory` and `--gpus` from the resources chosen in the widget. `ntopcl` takes the password as `-w`, so it is visible in the server's process list while a solve runs.
-
-The remote job folder, solve command and cancel command can be changed under Advanced in Settings.
-
-## Development
+There are no prebuilt downloads yet, so build the app from this repository. You'll need [Node.js](https://nodejs.org) and [Rust](https://rustup.rs). On Linux, also install `libwebkit2gtk-4.1-dev`, `libgtk-3-dev`, `libsoup-3.0-dev` and `librsvg2-dev`.
 
 ```bash
 npm install
 ```
 
 ```bash
-npm run tauri dev
+npm run tauri build
 ```
 
-`npm run dev` alone serves the UI in a browser with a simulated backend that replays a real ntopcl log, which is handy for UI work.
+The installer ends up in `src-tauri/target/release/bundle/`.
 
-On Linux, Tauri needs `libwebkit2gtk-4.1-dev`, `libgtk-3-dev`, `libsoup-3.0-dev` and `librsvg2-dev`.
+## Setting up
 
-## Code layout
+Open settings with the gear icon in the title bar.
 
-Frontend (`src/`):
+Enter your nTop username and password. The password is stored in your system's keychain and is only sent to your server when a solve starts.
 
-- `main.ts` wires everything up.
-- `app/state.ts` holds the app state; `app/job.ts` starts and cancels jobs and applies backend events to the state.
-- `ui/` has one module per part of the window (header, project, resources, monitor, solver, step feed, footer, settings), each with a `render…` function and a `setup…` function for its event handlers. `ui/render.ts` redraws them all.
-- `backend/` talks to Rust through Tauri, or replays a real log in the browser preview.
-- `lib/` has DOM helpers, formatting and the ntopcl log parser.
+Under Compute, fill in your server's host, port, user name and the path to your SSH private key (for example `~/.ssh/id_ed25519`, not the `.pub` file). Then press Test connection. If it works, you'll see the server's cores, memory and GPUs, and whether Python and Docker were found. Those numbers become the maximums you can request.
 
-Backend (`src-tauri/src/`):
+Settings save as you type.
 
-- `commands.rs` is everything the UI can call; `lib.rs` only registers it.
-- `job.rs` runs one job end to end, using `server.rs` (checks, probe, runner install), `transfer.rs` (upload and download with progress), `solver.rs` (the remote solve and stopping it) and `stats.rs` (CPU, memory and GPU usage).
-- `events.rs` is every event sent to the UI; `cancel.rs` is how a job stops early; `remote.rs` wraps `ssh`.
-- `notebook.rs` reads the step plan from a `.ntop` file, `settings.rs` stores settings and `credentials.rs` the keychain password.
+## Running a solve
 
-`npm run check` type-checks and checks formatting; `npm run format` formats.
+1. Click Choose and pick the folder that holds your notebook. The folder should contain one `.ntop` file. Older `_solved.ntop` copies in the same folder are fine and won't be uploaded.
+2. Click the CPU, memory or GPU numbers to change how much of the server the solve can use.
+3. Press Send & solve.
 
-## Not done yet
+The bar under Solver shows the upload, then how many of the notebook's steps have finished, then the download. During a topology optimization a second bar shows the iteration count, with a chart of the objective and the largest design change per iteration. Show all logs opens the full ntopcl output, and any errors are counted next to it.
 
-- AWS provider.
-- Desktop notification when a solve finishes.
+When the solve finishes, the solved notebook is saved as `<name>_solved.ntop` next to your original. If you'd rather overwrite the original, change "When the solve finishes" in settings.
+
+Cancel stops the solve on the server, removes its files there and then disconnects. It can take up to ten seconds.
+
+## Good to know
+
+ntopcl takes your password as a command-line argument, so other users on the server can see it in the process list while a solve is running. Use a server you trust.
+
+The first nTop image Docker lists is used. If your server has more than one, pick one by changing the solve command under Advanced in settings, for example `NTOP_IMAGE=ntop:5.12 python3 ~/.naccelerate/ntop-run.py --input {folder}`.
+
+If a solve fails, its files stay on the server under `~/naccelerate/jobs` so you can look at what went wrong. You can change that folder, and the commands used to run and cancel a solve, under Advanced in settings.
