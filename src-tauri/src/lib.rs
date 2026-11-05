@@ -71,9 +71,7 @@ fn start_job(app: AppHandle, state: State<JobState>, request: job::JobRequest) -
     if settings.provider == Provider::Aws {
         return Err("AWS isn't available yet. Choose a self-hosted server in Settings.".into());
     }
-    if settings.self_hosted.host.trim().is_empty() {
-        return Err("Set up a self-hosted server in Settings first.".into());
-    }
+    remote::check(&settings.self_hosted)?;
     let mut slot = state.0.lock().map_err(|e| e.to_string())?;
     if slot.as_ref().is_some_and(|tx| !tx.is_closed()) {
         return Err("A job is already running.".into());

@@ -38,6 +38,21 @@ pub fn target(sh: &SelfHosted) -> String {
     }
 }
 
+/// Catches setup mistakes that ssh would otherwise report with a long, confusing message.
+pub fn check(sh: &SelfHosted) -> Result<(), String> {
+    if sh.host.trim().is_empty() {
+        return Err("Enter a host first.".into());
+    }
+    let key = sh.key_path.trim();
+    if key.to_lowercase().ends_with(".pub") {
+        return Err(format!(
+            "The SSH key should be the private key, not the .pub file. Try {}.",
+            &key[..key.len() - 4]
+        ));
+    }
+    Ok(())
+}
+
 fn common_opts(cmd: &mut Command, sh: &SelfHosted) {
     cmd.args(["-o", "BatchMode=yes", "-o", "ConnectTimeout=10", "-o", "StrictHostKeyChecking=accept-new", "-o", "ServerAliveInterval=15"]);
     if !sh.key_path.trim().is_empty() {
@@ -82,7 +97,12 @@ pub async fn output(mut cmd: Command) -> Result<String, String> {
     if out.status.success() {
         Ok(String::from_utf8_lossy(&out.stdout).into_owned())
     } else {
-        let err = String::from_utf8_lossy(&out.stderr).trim().to_string();
+        let err = String::from_utf8_lossy(&out.stderr)
+            .lines()
+            .map(str::trim)
+            .filter(|l| !l.is_empty() && !l.chars().all(|c| c == '@'))
+            .collect::<Vec<_>>()
+            .join("\n");
         Err(if err.is_empty() { format!("Remote command failed ({})", out.status) } else { err })
     }
 }
@@ -93,9 +113,7 @@ pub async fn run(sh: &SelfHosted, script: &str) -> Result<String, String> {
 
 /// Reads core count, memory, GPUs and OS from a Linux host, and checks that the solve command exists.
 pub async fn probe(sh: &SelfHosted) -> Result<HostInfo, String> {
-    if sh.host.trim().is_empty() {
-        return Err("Enter a host first.".into());
-    }
+    check(sh)?;
     let program = sh
         .command
         .split_whitespace()
