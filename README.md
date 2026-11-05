@@ -1,5 +1,7 @@
 <p align="center">
-<img alt="nAccelerate" src="assets/logo.svg" height="64">
-
-nAccelerate is an unofficial utility that connects cloud-compute to local nTop workflows for expedited iteration.
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/logo-dark.svg">
+    <img src="assets/logo.svg" alt="Logo" width="400">
+  </picture>
+    nAccelerate is an unofficial utility that connects cloud-compute to local nTop workflows for expedited iteration.
 </p>
