@@ -52,6 +52,11 @@ pub fn has_password(user: String) -> bool {
 /// Finds the notebook in a project folder (ignoring earlier `_solved` copies) and reads its step plan.
 #[tauri::command]
 pub fn inspect_folder(path: String) -> Result<FolderInfo, String> {
+    // A dropped .ntop file stands for the folder it's in.
+    let path = match Path::new(&path) {
+        p if p.is_file() => p.parent().map(|d| d.to_string_lossy().into_owned()).unwrap_or(path),
+        _ => path,
+    };
     let dir = Path::new(&path);
     let mut notebooks: Vec<String> = std::fs::read_dir(dir)
         .map_err(|e| e.to_string())?
