@@ -31,6 +31,11 @@ export interface Stats {
   gpus: Gpu[];
 }
 
+export interface Progress {
+  done: number;
+  total: number;
+}
+
 export interface FolderInfo {
   path: string;
   name: string;
@@ -46,6 +51,7 @@ export interface Handlers {
   status(phase: Phase): void;
   log(line: string): void;
   stats(stats: Stats): void;
+  progress(progress: Progress): void;
   error(message: string): void;
 }
 

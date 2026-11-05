@@ -1,7 +1,8 @@
 //! One remote solve: upload the project folder, run the solver over ssh while streaming its log and the
 //! machine's stats, download the saved notebook, then clean up and disconnect.
 
-use crate::remote::{self, scp_path, shell_path, shell_quote};
+use crate::remote::{self, shell_path, shell_quote};
+use crate::upload::{self, Outcome};
 use crate::settings::{ResultMode, Settings};
 use crate::stats;
 use serde::Deserialize;
@@ -33,7 +34,7 @@ impl From<String> for Stop {
     }
 }
 
-async fn cancelled(rx: &mut watch::Receiver<bool>) {
+pub(crate) async fn cancelled(rx: &mut watch::Receiver<bool>) {
     let hit = rx.wait_for(|c| *c).await.is_ok();
     if !hit {
         std::future::pending::<()>().await;
@@ -90,7 +91,7 @@ fn job_name(folder: &str) -> String {
 }
 
 /// Everything in the folder except other `.ntop` files, since the solver expects exactly one notebook.
-fn upload_entries(folder: &Path, notebook: &str) -> Result<Vec<String>, String> {
+fn upload_entries(folder: &Path, notebook: &str) -> Result<Vec<PathBuf>, String> {
     let mut out = Vec::new();
     for entry in std::fs::read_dir(folder).map_err(|e| e.to_string())? {
         let entry = entry.map_err(|e| e.to_string())?;
@@ -98,7 +99,7 @@ fn upload_entries(folder: &Path, notebook: &str) -> Result<Vec<String>, String> 
         if name.to_lowercase().ends_with(".ntop") && name != notebook {
             continue;
         }
-        out.push(entry.path().to_string_lossy().into_owned());
+        out.push(entry.path());
     }
     Ok(out)
 }
@@ -117,14 +118,16 @@ async fn solve(ctx: &mut Ctx, settings: &Settings, req: &JobRequest, password: O
 
     ctx.status("queued");
     ctx.log('I', &format!("Connecting to {target}"));
-    ctx.step(remote::run(sh, &format!("mkdir -p {}", shell_path(&remote_folder)))).await?;
+    ctx.step(remote::run(sh, "true")).await?;
     ctx.log('I', &format!("Connected to {}", sh.host));
 
     ctx.status("upload");
     let entries = upload_entries(&local, &req.notebook)?;
     ctx.log('I', &format!("Uploading {folder_name}/ ({} items)", entries.len()));
-    let dest = format!("{target}:{}/", scp_path(&remote_folder));
-    ctx.step(remote::output(remote::scp(sh, &entries, &dest))).await?;
+    match upload::upload(&ctx.app, sh, entries, &remote_folder, &mut ctx.cancel).await? {
+        Outcome::Done => {}
+        Outcome::Cancelled => return Err(Stop::Cancelled),
+    }
     ctx.log('I', &format!("Uploaded {folder_name}/"));
 
     ctx.status("solve");

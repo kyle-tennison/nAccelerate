@@ -25,11 +25,6 @@ pub fn shell_quote(s: &str) -> String {
     format!("'{}'", s.replace('\'', r"'\''"))
 }
 
-/// scp resolves relative paths against the remote home directory, so `~/x` becomes `x`.
-pub fn scp_path(path: &str) -> String {
-    path.strip_prefix("~/").unwrap_or(path).to_string()
-}
-
 pub fn target(sh: &SelfHosted) -> String {
     if sh.user.trim().is_empty() {
         sh.host.trim().to_string()

@@ -2,6 +2,7 @@ mod job;
 mod remote;
 mod settings;
 mod stats;
+mod upload;
 
 use serde::Serialize;
 use settings::{HostInfo, Provider, Settings};

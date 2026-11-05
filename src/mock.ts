@@ -84,8 +84,10 @@ export class MockBackend implements Backend {
       if (phase === "queued" && elapsed > 1500) {
         phase = "upload"; since = Date.now(); this.status(phase);
         this.log("I", `Uploading ${req.folder.split(/[\\/]/).pop()}/`);
-      } else if (phase === "upload" && elapsed > 2000) {
-        phase = "solve"; since = Date.now(); this.status(phase);
+      } else if (phase === "upload") {
+        const total = 48_200_000;
+        this.h?.progress({ done: Math.min(total, Math.round((elapsed / 3000) * total)), total });
+        if (elapsed > 3000) { phase = "solve"; since = Date.now(); this.status(phase); }
       } else if (phase === "solve") {
         for (let n = 0; n < 4 && cursor < SAMPLE_LOG.length; n++) {
           const l = SAMPLE_LOG[cursor++];

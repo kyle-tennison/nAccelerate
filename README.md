@@ -5,7 +5,7 @@ A small desktop widget (Tauri) that sends an nTop project folder to a more power
 ## How it works
 
 1. Settings holds the nTop login (the password lives in the system keychain) and a self-hosted server: host, port, user, SSH key, remote job folder, solve command and cancel command. AWS is not available yet.
-2. Send & solve uploads the chosen folder with `scp` into a fresh job folder on the server. Other `.ntop` files in the folder, such as earlier `_solved` copies, are left out because the solver expects exactly one notebook.
+2. Send & solve streams the chosen folder to a fresh job folder on the server as a tar archive over ssh, so the upload has a real progress bar. Other `.ntop` files in the folder, such as earlier `_solved` copies, are left out because the solver expects exactly one notebook.
 3. The solve command runs over `ssh` inside the job folder (default `ntop --input {folder}`). It receives `NTOP_EMAIL`, `NTOP_PASSWORD` (sent over stdin, not on the command line), `NACCEL_JOB`, `NACCEL_CPUS`, `NACCEL_CPUSET`, `NACCEL_MEM_GB` and `NACCEL_GPUS`. `{folder}`, `{job}`, `{cpus}`, `{cpu_last}`, `{mem_gb}` and `{gpus}` in the command are also filled in.
 4. A second ssh connection streams `/proc/stat`, `/proc/meminfo` and `nvidia-smi` once a second for the CPU tiles, memory bar and GPU meters. The first `NACCEL_CPUS` cores are shown, so pin the solver to `NACCEL_CPUSET`.
 5. When the solver prints `Saved: <path>`, that file is downloaded next to the local notebook (as `<name>_solved.ntop`, or replacing it), the remote job folder is removed and the connection is closed.

@@ -7,7 +7,7 @@ import { getBackend } from "./backend";
 import { CORE_HISTORY, ObjectiveChart, drawCores } from "./charts";
 import { lineKind, optResult, parseIters, pretty } from "./logparse";
 import { DEFAULT_SETTINGS } from "./mock";
-import type { FolderInfo, Gpu, Phase, ResourceKey, Resources, Settings, Stats } from "./types";
+import type { FolderInfo, Gpu, Phase, Progress, ResourceKey, Resources, Settings, Stats } from "./types";
 
 const be = getBackend();
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -30,6 +30,7 @@ const S = {
   memPeak: 0,
   gpus: [] as Gpu[],
   log: [] as string[],
+  upload: null as Progress | null,
   showAll: false,
   t0: 0,
   tEnd: 0,
@@ -57,6 +58,8 @@ function fmt(ms: number) {
   const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = String(s % 60).padStart(2, "0");
   return h ? `${h}:${String(m).padStart(2, "0")}:${sec}` : `${m}:${sec}`;
 }
+
+const mb = (bytes: number) => (bytes / 1e6).toFixed(bytes < 1e7 ? 1 : 0);
 
 let frame = 0;
 function schedule() {
@@ -102,10 +105,12 @@ function render() {
   // While the solver iterates, the bar runs 0 to the max iteration and the chart shows convergence. Once the iterating block finishes, both give way to plain step progress.
   const its = parseIters(S.log), lastIt = its[its.length - 1], finished = optResult(S.log);
   const iterating = !!lastIt && !finished && p === "solve";
+  const up = p === "upload" ? S.upload : null;
   const pr = $("prog");
-  pr.classList.toggle("indet", live && !iterating);
-  (pr.firstChild as HTMLElement).style.width = p === "done" ? "100%" : iterating ? `${(lastIt.i / lastIt.max) * 100}%` : "0%";
-  bind("progTxt", (e) => (e.textContent = iterating ? `Iter ${lastIt.i}/${lastIt.max}` : ""));
+  pr.classList.toggle("indet", live && !iterating && !up);
+  (pr.firstChild as HTMLElement).style.width =
+    p === "done" ? "100%" : iterating ? `${(lastIt.i / lastIt.max) * 100}%` : up ? `${(up.done / Math.max(1, up.total)) * 100}%` : "0%";
+  bind("progTxt", (e) => (e.textContent = iterating ? `Iter ${lastIt.i}/${lastIt.max}` : up ? `${mb(up.done)} / ${mb(up.total)} MB` : ""));
   $("obj-wrap").hidden = !iterating || its.length < 2;
   if (iterating && its.length >= 2) objective.draw(its);
 
@@ -160,7 +165,7 @@ function localLog(level: "I" | "W" | "E", text: string) {
 
 async function start() {
   if (!S.folder?.notebook) return;
-  S.log = []; S.coreHist = []; S.memGb = 0; S.memPeak = 0; S.gpus = [];
+  S.log = []; S.coreHist = []; S.memGb = 0; S.memPeak = 0; S.gpus = []; S.upload = null;
   S.t0 = Date.now(); S.tEnd = 0; S.phase = "queued";
   S.settings.resources = { ...S.req };
   await be.saveSettings(S.settings);
@@ -320,7 +325,7 @@ $("n-pass").addEventListener("change", async () => {
 });
 
 async function init() {
-  await be.listen({ status: onStatus, log: onLog, stats: onStats, error: () => schedule() });
+  await be.listen({ status: onStatus, log: onLog, stats: onStats, progress: (pr) => { S.upload = pr; schedule(); }, error: () => schedule() });
   S.settings = await be.loadSettings();
   S.showAll = S.settings.results.showAllLogs;
   const L = limits();

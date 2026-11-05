@@ -3,7 +3,7 @@ import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { open } from "@tauri-apps/plugin-dialog";
 import { MockBackend } from "./mock";
-import type { Backend, FolderInfo, Handlers, HostInfo, JobRequest, Phase, Settings, Stats } from "./types";
+import type { Backend, FolderInfo, Handlers, HostInfo, JobRequest, Phase, Progress, Settings, Stats } from "./types";
 
 class TauriBackend implements Backend {
   loadSettings() {
@@ -36,6 +36,7 @@ class TauriBackend implements Backend {
     await listen<Phase>("job-status", (e) => h.status(e.payload));
     await listen<string>("job-log", (e) => h.log(e.payload));
     await listen<Stats>("job-stats", (e) => h.stats(e.payload));
+    await listen<Progress>("job-progress", (e) => h.progress(e.payload));
     await listen<string>("job-error", (e) => h.error(e.payload));
   }
   minimize() {
