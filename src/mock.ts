@@ -65,6 +65,7 @@ export class MockBackend implements Backend {
   async listen(h: Handlers) {
     this.h = h;
   }
+  startResize() {}
   minimize() {}
   close() {}
 

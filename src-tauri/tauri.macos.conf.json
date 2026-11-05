@@ -1,0 +1,19 @@
+{
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "nAccelerate",
+        "width": 352,
+        "height": 760,
+        "minWidth": 320,
+        "minHeight": 420,
+        "decorations": true,
+        "titleBarStyle": "Overlay",
+        "hiddenTitle": true,
+        "trafficLightPosition": { "x": 12, "y": 18 },
+        "resizable": true
+      }
+    ]
+  }
+}

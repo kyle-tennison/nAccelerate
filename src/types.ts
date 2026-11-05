@@ -1,3 +1,4 @@
+export type ResizeDirection = "North" | "South" | "East" | "West" | "NorthEast" | "NorthWest" | "SouthEast" | "SouthWest";
 export type Phase = "idle" | "queued" | "upload" | "solve" | "download" | "cancelling" | "done";
 export type ResourceKey = "cpu" | "mem" | "gpu";
 export type Resources = Record<ResourceKey, number>;
@@ -72,6 +73,7 @@ export interface Backend {
   startJob(request: JobRequest): Promise<void>;
   cancelJob(): Promise<void>;
   listen(handlers: Handlers): Promise<void>;
+  startResize(direction: ResizeDirection): void;
   minimize(): void;
   close(): void;
 }

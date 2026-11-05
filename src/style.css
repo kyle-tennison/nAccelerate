@@ -60,6 +60,19 @@ label.btn input[type=file] { position: absolute; opacity: 0; width: 1px; height:
 .seg button { font-size: 12px; border: 0; background: transparent; color: var(--ink-2); padding: 4px 10px; border-radius: 5px; cursor: pointer }
 .seg button[aria-pressed="true"] { background: var(--panel-3); color: var(--ink) }
 
+/* Frameless windows (Windows, Linux) get invisible grips along the edges for resizing. macOS keeps its native frame. */
+.grips i { position: fixed; z-index: 50 }
+.grips [data-dir="North"] { top: 0; left: 8px; right: 8px; height: 5px; cursor: ns-resize }
+.grips [data-dir="South"] { bottom: 0; left: 8px; right: 8px; height: 6px; cursor: ns-resize }
+.grips [data-dir="East"] { right: 0; top: 8px; bottom: 8px; width: 6px; cursor: ew-resize }
+.grips [data-dir="West"] { left: 0; top: 8px; bottom: 8px; width: 6px; cursor: ew-resize }
+.grips [data-dir="NorthWest"] { top: 0; left: 0; width: 10px; height: 10px; cursor: nwse-resize }
+.grips [data-dir="SouthEast"] { bottom: 0; right: 0; width: 12px; height: 12px; cursor: nwse-resize }
+.grips [data-dir="NorthEast"] { top: 0; right: 0; width: 10px; height: 10px; cursor: nesw-resize }
+.grips [data-dir="SouthWest"] { bottom: 0; left: 0; width: 12px; height: 12px; cursor: nesw-resize }
+.mac .grips, .mac #min, .mac #close { display: none }
+.mac .w-head { padding-left: 76px }
+
 /* Window */
 .w { height: 100%; display: flex; flex-direction: column; background: var(--panel); overflow: hidden }
 #v-main:not([hidden]), #v-set:not([hidden]) { flex: 1; min-height: 0; display: flex; flex-direction: column }

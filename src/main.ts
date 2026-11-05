@@ -7,9 +7,10 @@ import { getBackend } from "./backend";
 import { CORE_HISTORY, ObjectiveChart, drawCores } from "./charts";
 import { lineKind, optResult, parseIters, pretty, stepEvents, type StepEvent } from "./logparse";
 import { DEFAULT_SETTINGS } from "./mock";
-import type { Block, FolderInfo, Gpu, Phase, Progress, ResourceKey, Resources, Settings, Stats } from "./types";
+import type { Block, FolderInfo, Gpu, Phase, ResizeDirection, Progress, ResourceKey, Resources, Settings, Stats } from "./types";
 
 const be = getBackend();
+if ("__TAURI_INTERNALS__" in window && /Mac/.test(navigator.userAgent)) document.documentElement.classList.add("mac");
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 const input = (id: string) => $<HTMLInputElement>(id);
 const bind = (key: string, fn: (el: HTMLElement) => void) => document.querySelectorAll<HTMLElement>(`[data-bind="${key}"]`).forEach(fn);
@@ -307,6 +308,9 @@ $("choose").addEventListener("click", async () => {
 $("log-toggle").addEventListener("click", () => { S.showAll = !S.showAll; delete $("log").dataset.init; render(); });
 $("errs").addEventListener("click", () => { S.showAll = true; render(); });
 $("min").addEventListener("click", () => be.minimize());
+document.querySelectorAll<HTMLElement>(".grips [data-dir]").forEach((g) =>
+  g.addEventListener("mousedown", (e) => { if (e.button === 0) { e.preventDefault(); be.startResize(g.dataset.dir as ResizeDirection); } }),
+);
 $("close").addEventListener("click", () => be.close());
 
 document.querySelectorAll<HTMLElement>(".step").forEach((step) => {
