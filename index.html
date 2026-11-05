@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>nAccelerate</title>
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <div class="w" id="W">
+      <div class="w-head" data-tauri-drag-region>
+        <button class="cap-icon" type="button" id="back" aria-label="Back" hidden><svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" class="bi" aria-hidden="true" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M15 8a.5.5 0 0 0-.5-.5H2.707l3.147-3.146a.5.5 0 1 0-.708-.708l-4 4a.5.5 0 0 0 0 .708l4 4a.5.5 0 0 0 .708-.708L2.707 8.5H14.5A.5.5 0 0 0 15 8"/></svg></button>
+        <span class="logo" id="head-logo" data-tauri-drag-region><svg viewBox="0 0 100 100" aria-hidden="true"><path class="frame" stroke-width="8" d="M6 94V34A28 28 0 0 1 34 6H66A28 28 0 0 1 94 34V66A28 28 0 0 1 66 94Z"/><path class="bolt" d="M60 17 27 57H46L39 83 73 42H54Z"/></svg>nAccelerate</span>
+        <span class="t" id="head-title" hidden>Settings</span>
+        <span class="chip" data-bind="chip" id="head-chip" data-tauri-drag-region>Ready</span>
+        <span class="sp" data-tauri-drag-region></span>
+        <button class="cap" type="button" id="gear" aria-label="Settings"><svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" class="bi" aria-hidden="true" viewBox="0 0 16 16"><path d="M8 4.754a3.246 3.246 0 1 0 0 6.492 3.246 3.246 0 0 0 0-6.492M5.754 8a2.246 2.246 0 1 1 4.492 0 2.246 2.246 0 0 1-4.492 0"/><path d="M9.796 1.343c-.527-1.79-3.065-1.79-3.592 0l-.094.319a.873.873 0 0 1-1.255.52l-.292-.16c-1.64-.892-3.433.902-2.54 2.541l.159.292a.873.873 0 0 1-.52 1.255l-.319.094c-1.79.527-1.79 3.065 0 3.592l.319.094a.873.873 0 0 1 .52 1.255l-.16.292c-.892 1.64.901 3.434 2.541 2.54l.292-.159a.873.873 0 0 1 1.255.52l.094.319c.527 1.79 3.065 1.79 3.592 0l.094-.319a.873.873 0 0 1 1.255-.52l.292.16c1.64.893 3.434-.902 2.54-2.541l-.159-.292a.873.873 0 0 1 .52-1.255l.319-.094c1.79-.527 1.79-3.065 0-3.592l-.319-.094a.873.873 0 0 1-.52-1.255l.16-.292c.893-1.64-.902-3.433-2.541-2.54l-.292.159a.873.873 0 0 1-1.255-.52zm-2.633.283c.246-.835 1.428-.835 1.674 0l.094.319a1.873 1.873 0 0 0 2.693 1.115l.291-.16c.764-.415 1.6.42 1.184 1.185l-.159.292a1.873 1.873 0 0 0 1.116 2.692l.318.094c.835.246.835 1.428 0 1.674l-.319.094a1.873 1.873 0 0 0-1.115 2.693l.16.291c.415.764-.42 1.6-1.185 1.184l-.291-.159a1.873 1.873 0 0 0-2.693 1.116l-.094.318c-.246.835-1.428.835-1.674 0l-.094-.319a1.873 1.873 0 0 0-2.692-1.115l-.292.16c-.764.415-1.6-.42-1.184-1.185l.159-.291A1.873 1.873 0 0 0 1.945 8.93l-.319-.094c-.835-.246-.835-1.428 0-1.674l.319-.094A1.873 1.873 0 0 0 3.06 4.377l-.16-.292c-.415-.764.42-1.6 1.185-1.184l.292.159a1.873 1.873 0 0 0 2.692-1.115z"/></svg></button>
+        <button class="cap" type="button" id="min" aria-label="Minimize"><svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" class="bi" aria-hidden="true" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M2 8a.5.5 0 0 1 .5-.5h11a.5.5 0 0 1 0 1h-11A.5.5 0 0 1 2 8"/></svg></button>
+        <button class="cap close" type="button" id="close" aria-label="Close"><svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" class="bi" aria-hidden="true" viewBox="0 0 16 16"><path d="M2.146 2.854a.5.5 0 1 1 .708-.708L8 7.293l5.146-5.147a.5.5 0 0 1 .708.708L8.707 8l5.147 5.146a.5.5 0 0 1-.708.708L8 8.707l-5.146 5.147a.5.5 0 0 1-.708-.708L7.293 8z"/></svg></button>
+      </div>
+
+      <div id="v-main">
+        <div class="view">
+          <div class="folder">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" class="bi" aria-hidden="true" viewBox="0 0 16 16"><path d="M1 3.5A1.5 1.5 0 0 1 2.5 2h2.764c.958 0 1.76.56 2.311 1.184C7.985 3.648 8.48 4 9 4h4.5A1.5 1.5 0 0 1 15 5.5v.64c.57.265.94.876.856 1.546l-.64 5.124A2.5 2.5 0 0 1 12.733 15H3.266a2.5 2.5 0 0 1-2.481-2.19l-.64-5.124A1.5 1.5 0 0 1 1 6.14zM2 6h12v-.5a.5.5 0 0 0-.5-.5H9c-.964 0-1.71-.629-2.174-1.154C6.374 3.334 5.82 3 5.264 3H2.5a.5.5 0 0 0-.5.5zm-.367 1a.5.5 0 0 0-.496.562l.64 5.124A1.5 1.5 0 0 0 3.266 14h9.468a1.5 1.5 0 0 0 1.489-1.314l.64-5.124A.5.5 0 0 0 14.367 7z"/></svg>
+            <div class="meta"><div class="trunc" style="font-weight:500" data-bind="fname"></div><div class="trunc xs dim" data-bind="fsub"></div></div>
+            <button class="btn" type="button" id="choose">Choose</button>
+          </div>
+
+          <div class="sec">
+            <div class="sec-h">Resources<span class="aside" data-bind="target"></span></div>
+            <div class="res">
+              <div class="step" data-k="cpu"><button type="button" class="show" id="cpu-show"><span class="k">CPUs</span><span class="v" data-v="cpu"></span></button><label class="edit" hidden><span class="k">CPUs</span><input type="number" id="cpu-in" inputmode="numeric" min="1"><span class="max" data-max="cpu"></span></label></div>
+              <div class="step" data-k="mem"><button type="button" class="show" id="mem-show"><span class="k">Memory</span><span class="v" data-v="mem"></span></button><label class="edit" hidden><span class="k">Memory, GB</span><input type="number" id="mem-in" inputmode="numeric" min="1"><span class="max" data-max="mem"></span></label></div>
+              <div class="step" data-k="gpu"><button type="button" class="show" id="gpu-show"><span class="k">GPUs</span><span class="v" data-v="gpu"></span></button><label class="edit" hidden><span class="k">GPUs</span><input type="number" id="gpu-in" inputmode="numeric" min="0"><span class="max" data-max="gpu"></span></label></div>
+            </div>
+          </div>
+
+          <div class="sec live">
+            <div class="sec-h">CPU<span class="aside r" data-bind="cpuTxt"></span></div>
+            <canvas class="cores" id="cores" aria-label="Per-core CPU usage over the last 30 seconds"></canvas>
+          </div>
+
+          <div class="sec live">
+            <div class="sec-h">Memory<span class="aside r" data-bind="memTxt"></span></div>
+            <div class="meter" id="mem-meter"><i class="job"></i></div>
+          </div>
+
+          <div class="sec live" id="gpu-sec">
+            <div class="sec-h">GPU<span class="aside r">Utilization · VRAM</span></div>
+            <div class="gpus" id="gpus"></div>
+          </div>
+
+          <div class="sec">
+            <div class="sec-h">Solver<span class="sp"></span><button class="errs" type="button" id="errs" hidden></button><button class="link" type="button" id="log-toggle">Show all logs</button></div>
+            <div class="prog-row"><div class="prog" id="prog"><i></i></div><span class="xs dim num" data-bind="progTxt"></span></div>
+            <div id="obj-wrap" style="position:relative" hidden>
+              <canvas class="obj" id="obj" aria-label="Objective (log scale) and max change over time"></canvas>
+              <div class="tip" id="tip" hidden></div>
+            </div>
+            <div class="latest"><span class="msg trunc" data-bind="latest" id="latest"></span></div>
+            <div class="log" id="log" hidden aria-live="polite"></div>
+          </div>
+        </div>
+        <div class="foot">
+          <span class="xs dim num" data-bind="cost"></span><span class="sp"></span>
+          <button class="btn primary" type="button" id="go">Send &amp; solve</button>
+        </div>
+      </div>
+
+      <div id="v-set" hidden>
+        <div class="view">
+          <div class="sec">
+            <div class="sec-h">nTop account</div>
+            <label class="field"><span>Username</span><input id="n-user" autocomplete="username" placeholder="you@example.com"></label>
+            <label class="field"><span>Password</span><input id="n-pass" type="password" autocomplete="current-password" placeholder="Saved in your system keychain"></label>
+            <div class="row"><button class="btn" type="button" id="signin">Save login</button><span class="xs dim">Used to check out an nTop license on the remote machine.</span></div>
+            <div class="status" id="signin-out" hidden></div>
+          </div>
+
+          <div class="hr"></div>
+
+          <div class="sec">
+            <div class="sec-h">Compute</div>
+            <div class="prov">
+              <label><input type="radio" name="prov" id="prov-self" value="self"><strong>Self-hosted</strong><span>Your own server over SSH. Free.</span></label>
+              <label title="AWS support is coming soon"><input type="radio" name="prov" id="prov-aws" value="aws" disabled><strong>AWS</strong><span>Coming soon.</span></label>
+            </div>
+          </div>
+
+          <div class="sec" id="set-self">
+            <div class="fields2">
+              <label class="field"><span>Host</span><input id="s-host" placeholder="hpc-01.lan" spellcheck="false"></label>
+              <label class="field"><span>Port</span><input id="s-port" inputmode="numeric" placeholder="22"></label>
+            </div>
+            <label class="field"><span>User</span><input id="s-user" spellcheck="false"></label>
+            <label class="field"><span>SSH key</span><input id="s-key" placeholder="~/.ssh/id_ed25519" spellcheck="false"></label>
+            <label class="field"><span>Remote job folder</span><input id="s-dir" placeholder="~/naccelerate/jobs" spellcheck="false"></label>
+            <label class="field"><span>Solve command</span><input id="s-cmd" spellcheck="false"></label>
+            <span class="xs dim">Runs inside the uploaded job folder. {folder}, {cpus}, {cpu_last} and {mem_gb} are filled in.</span>
+            <div class="row"><button class="btn" type="button" id="test">Test connection</button></div>
+            <div class="status" id="test-out" hidden></div>
+          </div>
+
+          <div class="hr"></div>
+
+          <div class="sec">
+            <div class="sec-h">Results</div>
+            <label class="field"><span>When the solve finishes</span><select id="r-mode"><option value="copy">Save as a copy (name_solved.ntop)</option><option value="replace">Replace the local file</option></select></label>
+            <label class="check"><input type="checkbox" id="r-logs"> Always show all logs</label>
+          </div>
+        </div>
+        <div class="foot"><span class="sp"></span><button class="btn" type="button" id="set-cancel">Cancel</button><button class="btn primary" type="button" id="set-save">Save</button></div>
+      </div>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
