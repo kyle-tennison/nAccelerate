@@ -20,7 +20,7 @@
   --close-ink: #ffffff;
   --sans: "Figtree", system-ui, sans-serif;
   --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
-  --brand: "Tomorrow", "Arial Black", system-ui, sans-serif;
+  --brand: "Archivo", "Arial Black", system-ui, sans-serif;
   color-scheme: dark;
 }
 
@@ -63,7 +63,7 @@ svg.bi {
   gap: 0.42em;
   color: var(--ink);
   font-family: var(--brand);
-  font-weight: 700;
+  font-weight: 800;
   letter-spacing: -0.02em;
   line-height: 1;
 }
