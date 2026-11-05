@@ -1,12 +1,12 @@
-/* nTop palette: #0D0C0B ink-black, #16489D blue, #f6f2ef warm paper. --viz is the blue lifted for data marks on the dark ground. */
+/* Cool neutral greys and blue accents, matching the nTop desktop app. --viz is the blue lifted for data marks on the dark ground. */
 :root {
-  --desk: #0d0c0b;
-  --panel: #181614;
-  --panel-2: #211e1b;
-  --panel-3: #2b2723;
-  --ink: #f6f2ef;
-  --ink-2: #a49c94;
-  --line: #34302b;
+  --desk: #17181b;
+  --panel: #1f2023;
+  --panel-2: #2a2b2f;
+  --panel-3: #35363b;
+  --ink: #e9eaed;
+  --ink-2: #9a9ca4;
+  --line: #383a3f;
   --accent: #16489d;
   --accent-hi: #1d56b8;
   --accent-2: #7da2e3;
@@ -15,7 +15,7 @@
   --ok: #4fae7a;
   --warn: #d99a3d;
   --bad: #e0605a;
-  --heat-0: #27231f;
+  --heat-0: #2a2c31;
   --close: #c42b1c;
   --close-ink: #ffffff;
   --sans: "Figtree", system-ui, sans-serif;
