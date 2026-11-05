@@ -5,5 +5,9 @@
   </picture>
 </p>
 <p align="center">
-    nAccelerate is an unofficial utility that connects cloud-compute to local nTop workflows for expedited iteration.
+    nAccelerate is an <u>unofficial</u> utility that connects cloud-compute to local <a href="https://www.ntop.com/">nTop</a> workflows for expedited iteration.
 </p>
+
+<hr/>
+
+
