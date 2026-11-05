@@ -67,10 +67,8 @@ export class ObjectiveChart {
     if (its.length < 2) return;
     const padX = 4, top = 6, bottom = 18, pw = w - padX * 2, ph = h - top - bottom;
     const t0 = its[0].t, t1 = its[its.length - 1].t;
-    // Early iterations drop by orders of magnitude, so the top of the y-range is capped relative to the median to keep the tail readable.
-    const sorted = its.map((d) => Math.log10(d.obj)).sort((a, b) => a - b);
-    const lo = sorted[0], med = sorted[Math.floor(sorted.length / 2)], max = sorted[sorted.length - 1];
-    const hi = its.length > 6 ? Math.min(max, lo + 3 * Math.max(med - lo, 1e-3)) : max;
+    const logs = its.map((d) => Math.log10(d.obj));
+    const lo = Math.min(...logs), hi = Math.max(...logs);
     const span = Math.max(hi - lo, 1e-3), oLo = lo - span * 0.1, oHi = hi + span * 0.1;
     const cMax = Math.max(...its.map((d) => d.chg)) * 1.1 || 1;
     const x = (t: number) => padX + ((t - t0) / Math.max(1, t1 - t0)) * pw;
