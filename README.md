@@ -43,6 +43,25 @@ npm run tauri dev
 
 On Linux, Tauri needs `libwebkit2gtk-4.1-dev`, `libgtk-3-dev`, `libsoup-3.0-dev` and `librsvg2-dev`.
 
+## Code layout
+
+Frontend (`src/`):
+
+- `main.ts` wires everything up.
+- `app/state.ts` holds the app state; `app/job.ts` starts and cancels jobs and applies backend events to the state.
+- `ui/` has one module per part of the window (header, project, resources, monitor, solver, step feed, footer, settings), each with a `render…` function and a `setup…` function for its event handlers. `ui/render.ts` redraws them all.
+- `backend/` talks to Rust through Tauri, or replays a real log in the browser preview.
+- `lib/` has DOM helpers, formatting and the ntopcl log parser.
+
+Backend (`src-tauri/src/`):
+
+- `commands.rs` is everything the UI can call; `lib.rs` only registers it.
+- `job.rs` runs one job end to end, using `server.rs` (checks, probe, runner install), `transfer.rs` (upload and download with progress), `solver.rs` (the remote solve and stopping it) and `stats.rs` (CPU, memory and GPU usage).
+- `events.rs` is every event sent to the UI; `cancel.rs` is how a job stops early; `remote.rs` wraps `ssh`.
+- `notebook.rs` reads the step plan from a `.ntop` file, `settings.rs` stores settings and `credentials.rs` the keychain password.
+
+`npm run check` type-checks and checks formatting; `npm run format` formats.
+
 ## Not done yet
 
 - AWS provider.

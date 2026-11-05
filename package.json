@@ -6,17 +6,20 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "format": "prettier --write src index.html",
+    "check": "tsc --noEmit && prettier --check src index.html"
   },
   "dependencies": {
     "@fontsource/archivo": "^5.3.0",
+    "@fontsource/figtree": "^5.3.0",
     "@fontsource/ibm-plex-mono": "^5.3.0",
-    "@fontsource/ibm-plex-sans": "^5.3.0",
     "@tauri-apps/api": "^2.0.0",
     "@tauri-apps/plugin-dialog": "^2.0.0"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2.0.0",
+    "prettier": "^3.3.3",
     "typescript": "~5.6.2",
     "vite": "^5.4.10"
   }
