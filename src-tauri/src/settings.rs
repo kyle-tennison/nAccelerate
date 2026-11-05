@@ -73,7 +73,11 @@ pub struct Results {
 
 impl Default for Results {
     fn default() -> Self {
-        Self { mode: ResultMode::Copy, notify: true, show_all_logs: false }
+        Self {
+            mode: ResultMode::Copy,
+            notify: true,
+            show_all_logs: false,
+        }
     }
 }
 
@@ -113,7 +117,13 @@ impl Default for Settings {
             provider: Provider::SelfHosted,
             ntop_user: String::new(),
             self_hosted: SelfHosted::default(),
-            aws: Aws { region: "us-east-2".into(), profile: "default".into(), spend_cap: "$25.00".into(), spot: false, terminate: true },
+            aws: Aws {
+                region: "us-east-2".into(),
+                profile: "default".into(),
+                spend_cap: "$25.00".into(),
+                spot: false,
+                terminate: true,
+            },
             results: Results::default(),
             host_info: None,
             resources: None,

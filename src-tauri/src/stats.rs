@@ -1,29 +1,14 @@
 //! Streams CPU, memory and GPU usage from a Linux host over one long-lived ssh connection.
 
+use crate::events::{self, Gpu, Stats};
 use crate::remote;
 use crate::settings::SelfHosted;
-use serde::Serialize;
 use std::process::Stdio;
-use tauri::{AppHandle, Emitter};
+use tauri::AppHandle;
 use tokio::io::{AsyncBufReadExt, BufReader};
 
 const SCRIPT: &str = "while true; do grep '^cpu[0-9]' /proc/stat; grep -E '^(MemTotal|MemAvailable):' /proc/meminfo; \
 nvidia-smi --query-gpu=utilization.gpu,memory.used,memory.total --format=csv,noheader,nounits 2>/dev/null; echo ---; sleep 1; done";
-
-#[derive(Serialize, Clone, Default)]
-#[serde(rename_all = "camelCase")]
-pub struct Gpu {
-    pub util: f32,
-    pub vram: f32,
-}
-
-#[derive(Serialize, Clone, Default)]
-#[serde(rename_all = "camelCase")]
-pub struct Stats {
-    pub cores: Vec<f32>,
-    pub mem_gb: f32,
-    pub gpus: Vec<Gpu>,
-}
 
 #[derive(Default)]
 struct Block {
@@ -48,14 +33,17 @@ fn parse_line(block: &mut Block, line: &str) {
     } else {
         let f: Vec<f32> = line.split(',').filter_map(|x| x.trim().parse().ok()).collect();
         if f.len() == 3 && f[2] > 0.0 {
-            block.gpus.push(Gpu { util: f[0] / 100.0, vram: f[1] / f[2] });
+            block.gpus.push(Gpu {
+                util: f[0] / 100.0,
+                vram: f[1] / f[2],
+            });
         }
     }
 }
 
 /// Runs until the task is aborted. Only the first `cores` CPUs are reported, matching the cores the job is pinned to.
 pub async fn stream(app: AppHandle, sh: SelfHosted, cores: usize) {
-    let mut cmd = remote::ssh(&sh, SCRIPT, false);
+    let mut cmd = remote::ssh(&sh, SCRIPT);
     cmd.stdout(Stdio::piped()).stderr(Stdio::null());
     let Ok(mut child) = cmd.spawn() else { return };
     let Some(stdout) = child.stdout.take() else { return };
@@ -76,11 +64,22 @@ pub async fn stream(app: AppHandle, sh: SelfHosted, cores: usize) {
                 .take(cores.max(1))
                 .map(|(&(t, i), &(pt, pi))| {
                     let dt = t.saturating_sub(pt) as f32;
-                    if dt <= 0.0 { 0.0 } else { 1.0 - i.saturating_sub(pi) as f32 / dt }
+                    if dt <= 0.0 {
+                        0.0
+                    } else {
+                        1.0 - i.saturating_sub(pi) as f32 / dt
+                    }
                 })
                 .collect();
             let mem_gb = done.mem_total_kb.saturating_sub(done.mem_avail_kb) as f32 / 1024.0 / 1024.0;
-            let _ = app.emit("job-stats", Stats { cores: usage, mem_gb, gpus: done.gpus });
+            events::stats(
+                &app,
+                Stats {
+                    cores: usage,
+                    mem_gb,
+                    gpus: done.gpus,
+                },
+            );
         }
         prev = done.cpu;
     }

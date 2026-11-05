@@ -8,7 +8,10 @@ fn main() {
     }
     for path in paths {
         match naccelerate_lib::notebook::count_steps(std::path::Path::new(&path)) {
-            Ok(c) if c.groups > 1 => println!("{path}: {} steps ({} groups; nested groups are untested)", c.steps, c.groups),
+            Ok(c) if c.groups > 1 => println!(
+                "{path}: {} steps ({} groups; nested groups are untested)",
+                c.steps, c.groups
+            ),
             Ok(c) => println!("{path}: {} steps", c.steps),
             Err(e) => println!("{path}: could not count steps: {e}"),
         }

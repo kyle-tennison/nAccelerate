@@ -51,7 +51,8 @@ pub fn count_steps(path: &Path) -> Result<StepCount, String> {
     let len = file.metadata().map_err(|e| e.to_string())?.len();
 
     let mut head = [0u8; 24];
-    file.read_exact(&mut head).map_err(|_| "File is too short to be a notebook".to_string())?;
+    file.read_exact(&mut head)
+        .map_err(|_| "File is too short to be a notebook".to_string())?;
     if &head[..8] != FILE_MAGIC {
         return Err("Not a recognised .ntop file (unexpected header)".into());
     }
@@ -60,7 +61,8 @@ pub fn count_steps(path: &Path) -> Result<StepCount, String> {
         return Err(format!("Unexpected section count {n}"));
     }
     let mut table = vec![0u8; 24 * n as usize];
-    file.read_exact(&mut table).map_err(|_| "Section table is cut short".to_string())?;
+    file.read_exact(&mut table)
+        .map_err(|_| "Section table is cut short".to_string())?;
     let base = 0x18 + 24 * n + 80;
 
     let mut sections = Vec::new();
@@ -85,7 +87,10 @@ pub fn count_steps(path: &Path) -> Result<StepCount, String> {
         return Err("Section data does not start where expected".into());
     }
 
-    let (_, start, end) = sections.iter().find(|(name, _, _)| name == "main").ok_or("No main section")?;
+    let (_, start, end) = sections
+        .iter()
+        .find(|(name, _, _)| name == "main")
+        .ok_or("No main section")?;
     if end - start > MAX_MAIN_BYTES {
         return Err("The main section is unexpectedly large".into());
     }
@@ -93,14 +98,20 @@ pub fn count_steps(path: &Path) -> Result<StepCount, String> {
     file.seek(SeekFrom::Start(*start)).map_err(|e| e.to_string())?;
     file.read_exact(&mut main).map_err(|e| e.to_string())?;
 
-    let at = main.windows(7).position(|w| w == b"{\"code\"").ok_or("No block list in the main section")?;
+    let at = main
+        .windows(7)
+        .position(|w| w == b"{\"code\"")
+        .ok_or("No block list in the main section")?;
     // Binary data follows the JSON, so only the first complete value is parsed.
     let value: serde_json::Value = serde_json::Deserializer::from_slice(&main[at..])
         .into_iter()
         .next()
         .ok_or("Block list is empty")?
         .map_err(|e| format!("Could not read the block list: {e}"))?;
-    let code = value.get("code").and_then(|c| c.as_array()).ok_or("Block list has no code array")?;
+    let code = value
+        .get("code")
+        .and_then(|c| c.as_array())
+        .ok_or("Block list has no code array")?;
 
     let func = |r: &serde_json::Value| r.get("func").and_then(|f| f.as_str()).unwrap_or("").to_string();
     let is_step = |f: &str| !f.is_empty() && !f.starts_with("core.group");
@@ -110,14 +121,22 @@ pub fn count_steps(path: &Path) -> Result<StepCount, String> {
         .filter_map(|r| Some((r.get("id")?.as_u64()?, r.get("name")?.as_str()?.to_string())))
         .collect();
 
-    let mut count = StepCount { steps: 0, groups: 0, blocks: Vec::new() };
+    let mut count = StepCount {
+        steps: 0,
+        groups: 0,
+        blocks: Vec::new(),
+    };
     for record in code {
         let f = func(record);
         if f.starts_with("core.group") {
             count.groups += 1;
         } else if is_step(&f) {
             count.steps += 1;
-            let name = record.get("name").and_then(|n| n.as_str()).unwrap_or_default().to_string();
+            let name = record
+                .get("name")
+                .and_then(|n| n.as_str())
+                .unwrap_or_default()
+                .to_string();
             let mut deps: Vec<String> = record
                 .get("inputs")
                 .and_then(|i| i.as_array())
@@ -139,7 +158,12 @@ mod tests {
 
     fn notebook(main_json: &str) -> Vec<u8> {
         let first = [DATA_MAGIC.as_slice(), b"header data"].concat();
-        let main = [b"\x00\x01".as_slice(), main_json.as_bytes(), b"\xff\xfe binary \x80 tail"].concat();
+        let main = [
+            b"\x00\x01".as_slice(),
+            main_json.as_bytes(),
+            b"\xff\xfe binary \x80 tail",
+        ]
+        .concat();
         let sections: [(&str, &[u8]); 2] = [("stuff", &first), ("main", &main)];
         let mut out = FILE_MAGIC.to_vec();
         out.extend(2u64.to_le_bytes());
@@ -169,7 +193,13 @@ mod tests {
         std::fs::write(&path, notebook(json)).unwrap();
         let c = count_steps(&path).unwrap();
         assert_eq!((c.steps, c.groups), (4, 1));
-        assert_eq!(c.blocks[0], Block { name: "Mesh_0".into(), deps: vec!["Radius".into()] });
+        assert_eq!(
+            c.blocks[0],
+            Block {
+                name: "Mesh_0".into(),
+                deps: vec!["Radius".into()]
+            }
+        );
         assert_eq!(c.blocks[3].name, "Brücke");
         std::fs::remove_file(&path).unwrap();
     }
