@@ -1,4 +1,4 @@
-export type Phase = "idle" | "queued" | "upload" | "solve" | "download" | "done";
+export type Phase = "idle" | "queued" | "upload" | "solve" | "download" | "cancelling" | "done";
 export type ResourceKey = "cpu" | "mem" | "gpu";
 export type Resources = Record<ResourceKey, number>;
 

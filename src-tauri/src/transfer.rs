@@ -1,5 +1,5 @@
-//! Uploads files by streaming a tar archive into `tar -x` on the server, counting bytes as they go
-//! so the UI can show real progress (scp prints none when it has no terminal).
+//! File transfers over ssh that report real progress (scp prints none when it has no terminal).
+//! Uploads stream a tar archive into `tar -x`; downloads read the file size first and then its bytes.
 
 use crate::remote::{self, shell_path};
 use crate::settings::SelfHosted;
@@ -9,7 +9,7 @@ use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::time::{Duration, Instant};
 use tauri::{AppHandle, Emitter};
-use tokio::io::AsyncWriteExt;
+use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader};
 use tokio::sync::{mpsc, watch};
 
 #[derive(Serialize, Clone)]
@@ -80,10 +80,7 @@ pub async fn upload(
 
     let mut sent = 0u64;
     let mut last_emit = Instant::now() - Duration::from_secs(1);
-    let emit = |done: u64| {
-        let _ = app.emit("job-progress", Progress { done: done.min(total), total });
-    };
-    emit(0);
+    emit(app, 0, total);
     loop {
         tokio::select! {
             chunk = rx.recv() => match chunk {
@@ -91,7 +88,7 @@ pub async fn upload(
                     if stdin.write_all(&chunk).await.is_err() { break; }
                     sent += chunk.len() as u64;
                     if last_emit.elapsed() >= Duration::from_millis(100) {
-                        emit(sent);
+                        emit(app, sent, total);
                         last_emit = Instant::now();
                     }
                 }
@@ -112,8 +109,83 @@ pub async fn upload(
         return Err(if err.is_empty() { format!("Upload failed ({})", out.status) } else { err });
     }
     archived.map_err(|e| format!("Could not read the project folder: {e}"))?;
-    emit(total);
+    emit(app, total, total);
     Ok(Outcome::Done)
+}
+
+pub async fn download(
+    app: &AppHandle,
+    sh: &SelfHosted,
+    remote_path: &str,
+    local: &Path,
+    cancel: &mut watch::Receiver<bool>,
+) -> Result<Outcome, String> {
+    let path = shell_path(remote_path);
+    let mut cmd = remote::ssh(sh, &format!("wc -c < {path} && cat {path}"), false);
+    cmd.stdout(Stdio::piped()).stderr(Stdio::piped());
+    let mut child = cmd.spawn().map_err(|e| format!("Could not start ssh: {e}"))?;
+    let mut stdout = BufReader::new(child.stdout.take().ok_or("ssh has no output stream")?);
+    let mut stderr = child.stderr.take().ok_or("ssh has no error stream")?;
+
+    let mut header = String::new();
+    tokio::select! {
+        r = stdout.read_line(&mut header) => { r.map_err(|e| e.to_string())?; }
+        _ = crate::job::cancelled(cancel) => { let _ = child.kill().await; return Ok(Outcome::Cancelled); }
+    }
+    let Ok(total) = header.trim().parse::<u64>() else {
+        let _ = child.wait().await;
+        let mut err = String::new();
+        let _ = stderr.read_to_string(&mut err).await;
+        return Err(if err.trim().is_empty() { format!("Could not read {remote_path} on the server") } else { err.trim().to_string() });
+    };
+
+    // Write next to the target and rename at the end, so a failed download never clobbers the local notebook.
+    let part = local.with_extension("ntop.part");
+    let mut file = tokio::fs::File::create(&part).await.map_err(|e| format!("Could not write {}: {e}", part.display()))?;
+    let mut buf = vec![0u8; 256 * 1024];
+    let mut received = 0u64;
+    let mut last_emit = Instant::now() - Duration::from_secs(1);
+    emit(app, 0, total);
+    let failed = loop {
+        tokio::select! {
+            r = stdout.read(&mut buf) => match r {
+                Ok(0) => break None,
+                Ok(n) => {
+                    if let Err(e) = file.write_all(&buf[..n]).await { break Some(e.to_string()); }
+                    received += n as u64;
+                    if last_emit.elapsed() >= Duration::from_millis(100) {
+                        emit(app, received, total);
+                        last_emit = Instant::now();
+                    }
+                }
+                Err(e) => break Some(e.to_string()),
+            },
+            _ = crate::job::cancelled(cancel) => {
+                let _ = child.kill().await;
+                drop(file);
+                let _ = tokio::fs::remove_file(&part).await;
+                return Ok(Outcome::Cancelled);
+            }
+        }
+    };
+    let flushed = file.flush().await;
+    drop(file);
+    let status = child.wait().await.map_err(|e| e.to_string())?;
+    let problem = failed
+        .or_else(|| flushed.err().map(|e| e.to_string()))
+        .or_else(|| (!status.success()).then(|| format!("Download failed ({status})")))
+        .or_else(|| (received != total).then(|| format!("Download ended early ({received} of {total} bytes)")));
+    if let Some(problem) = problem {
+        let _ = tokio::fs::remove_file(&part).await;
+        return Err(problem);
+    }
+    tokio::fs::rename(&part, local).await.map_err(|e| format!("Could not save {}: {e}", local.display()))?;
+    emit(app, total, total);
+    Ok(Outcome::Done)
+}
+
+fn emit(app: &AppHandle, done: u64, total: u64) {
+    let _ = app.emit("job-progress", Progress { done: done.min(total), total });
 }
 
 #[cfg(test)]

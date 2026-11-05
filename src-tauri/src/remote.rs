@@ -73,14 +73,6 @@ pub fn ssh(sh: &SelfHosted, script: &str, tty: bool) -> Command {
     cmd
 }
 
-pub fn scp(sh: &SelfHosted, from: &[String], to: &str) -> Command {
-    let mut cmd = Command::new("scp");
-    cmd.arg("-P").arg(sh.port.to_string()).arg("-r");
-    common_opts(&mut cmd, sh);
-    cmd.args(from).arg(to);
-    cmd
-}
-
 pub async fn output(mut cmd: Command) -> Result<String, String> {
     let out = cmd
         .stdout(Stdio::piped())

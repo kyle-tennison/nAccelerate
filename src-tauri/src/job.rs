@@ -2,7 +2,7 @@
 //! machine's stats, download the saved notebook, then clean up and disconnect.
 
 use crate::remote::{self, shell_path, shell_quote};
-use crate::upload::{self, Outcome};
+use crate::transfer::{self, Outcome};
 use crate::settings::{ResultMode, Settings};
 use crate::stats;
 use serde::Deserialize;
@@ -72,7 +72,7 @@ pub async fn run(app: AppHandle, settings: Settings, req: JobRequest, password: 
         Ok(()) => ctx.status("done"),
         Err(stop) => {
             match stop {
-                Stop::Cancelled => ctx.log('W', "Cancelled; remote solve stopped"),
+                Stop::Cancelled => ctx.log('W', "Cancelled"),
                 Stop::Failed(e) => {
                     ctx.log('E', &format!("nAccelerate: {e}"));
                     let _ = ctx.app.emit("job-error", e);
@@ -124,9 +124,12 @@ async fn solve(ctx: &mut Ctx, settings: &Settings, req: &JobRequest, password: O
     ctx.status("upload");
     let entries = upload_entries(&local, &req.notebook)?;
     ctx.log('I', &format!("Uploading {folder_name}/ ({} items)", entries.len()));
-    match upload::upload(&ctx.app, sh, entries, &remote_folder, &mut ctx.cancel).await? {
+    match transfer::upload(&ctx.app, sh, entries, &remote_folder, &mut ctx.cancel).await? {
         Outcome::Done => {}
-        Outcome::Cancelled => return Err(Stop::Cancelled),
+        Outcome::Cancelled => {
+            cleanup(ctx, sh, &job_dir, &Stop::Cancelled).await;
+            return Err(Stop::Cancelled);
+        }
     }
     ctx.log('I', &format!("Uploaded {folder_name}/"));
 
@@ -157,13 +160,23 @@ async fn solve(ctx: &mut Ctx, settings: &Settings, req: &JobRequest, password: O
     );
     let stats_task = tokio::spawn(stats::stream(ctx.app.clone(), sh.clone(), req.cpu as usize));
     let solved = stream_solver(ctx, remote::ssh(sh, &script, false), password).await;
-    stats_task.abort();
     let saved = match solved {
-        Ok(p) => p,
+        Ok(p) => {
+            stats_task.abort();
+            p
+        }
         Err((stop, pid)) => {
+            // Stats keep streaming while the solver shuts down, so the CPU load can be seen dropping before disconnecting.
             if matches!(stop, Stop::Cancelled) {
-                stop_remote(sh, pid, &job).await;
+                ctx.log('I', "Stopping the remote solve");
+                if stop_remote(sh, pid, &job).await {
+                    ctx.log('I', "Remote solve stopped");
+                } else {
+                    ctx.log('W', "The remote solve may still be running; check the server");
+                }
             }
+            stats_task.abort();
+            cleanup(ctx, sh, &job_dir, &stop).await;
             return Err(stop);
         }
     };
@@ -177,8 +190,13 @@ async fn solve(ctx: &mut Ctx, settings: &Settings, req: &JobRequest, password: O
         }
     };
     ctx.log('I', &format!("Downloading {}", local_target.display()));
-    let from = format!("{target}:{saved}");
-    ctx.step(remote::output(remote::scp(sh, &[from], &local_target.to_string_lossy()))).await?;
+    match transfer::download(&ctx.app, sh, &saved, &local_target, &mut ctx.cancel).await? {
+        Outcome::Done => {}
+        Outcome::Cancelled => {
+            cleanup(ctx, sh, &job_dir, &Stop::Cancelled).await;
+            return Err(Stop::Cancelled);
+        }
+    }
     ctx.log('I', &format!("Received {}", local_target.display()));
 
     let _ = remote::run(sh, &format!("rm -rf {}", shell_path(&job_dir))).await;
@@ -189,18 +207,35 @@ async fn solve(ctx: &mut Ctx, settings: &Settings, req: &JobRequest, password: O
 
 const PID_MARK: &str = "NACCEL_PID ";
 
-/// Closing ssh does not stop a solver running in Docker, so cancel kills the remote process group and runs the user's cancel command.
-async fn stop_remote(sh: &crate::settings::SelfHosted, pid: Option<u32>, job: &str) {
+/// Removes the remote job folder after a cancel, so cancelled jobs don't pile up on the server.
+async fn cleanup(ctx: &Ctx, sh: &crate::settings::SelfHosted, job_dir: &str, stop: &Stop) {
+    if matches!(stop, Stop::Cancelled) {
+        let _ = remote::run(sh, &format!("rm -rf {}", shell_path(job_dir))).await;
+        ctx.log('I', "Removed the remote job folder");
+    }
+}
+
+/// Closing ssh does not stop a solver running in Docker, so cancel terminates the remote process group,
+/// waits up to 10 s for it to exit (then kills it), and runs the user's cancel command.
+/// Returns whether the solver's processes are confirmed gone.
+async fn stop_remote(sh: &crate::settings::SelfHosted, pid: Option<u32>, job: &str) -> bool {
     let mut script = String::new();
     if let Some(pid) = pid {
-        script.push_str(&format!("kill -TERM -- -{pid} 2>/dev/null; "));
+        script.push_str(&format!(
+            "kill -TERM -- -{pid} 2>/dev/null; \
+             for i in $(seq 1 20); do kill -0 -- -{pid} 2>/dev/null || break; sleep 0.5; done; \
+             kill -KILL -- -{pid} 2>/dev/null; "
+        ));
     }
     let cancel = sh.cancel_command.trim();
     if !cancel.is_empty() {
         script.push_str(&format!("{} >/dev/null 2>&1; ", cancel.replace("{job}", job)));
     }
-    script.push_str("true");
-    let _ = remote::run(sh, &script).await;
+    match pid {
+        Some(pid) => script.push_str(&format!("sleep 0.2; kill -0 -- -{pid} 2>/dev/null && echo running || echo stopped")),
+        None => script.push_str("echo stopped"),
+    }
+    matches!(remote::run(sh, &script).await, Ok(out) if out.trim().ends_with("stopped"))
 }
 
 /// Forwards every solver line to the UI and returns the remote path from the solver's `Saved: <path>` line.

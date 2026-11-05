@@ -15,8 +15,8 @@ const input = (id: string) => $<HTMLInputElement>(id);
 const bind = (key: string, fn: (el: HTMLElement) => void) => document.querySelectorAll<HTMLElement>(`[data-bind="${key}"]`).forEach(fn);
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;");
 
-const RUNNING: Phase[] = ["queued", "upload", "solve", "download"];
-const LABEL: Record<Phase, string> = { idle: "Ready", queued: "Queued", upload: "Uploading", solve: "Solving", download: "Downloading", done: "Complete" };
+const RUNNING: Phase[] = ["queued", "upload", "solve", "download", "cancelling"];
+const LABEL: Record<Phase, string> = { idle: "Ready", queued: "Queued", upload: "Uploading", solve: "Solving", download: "Downloading", cancelling: "Cancelling", done: "Complete" };
 const MIN: Resources = { cpu: 1, mem: 1, gpu: 0 };
 const KEYS: ResourceKey[] = ["cpu", "mem", "gpu"];
 
@@ -70,7 +70,7 @@ function render() {
   clampReq();
   const p = S.phase, live = running();
   const host = S.settings.selfHosted.host.trim();
-  bind("chip", (e) => { e.dataset.p = p; e.textContent = LABEL[p]; });
+  bind("chip", (e) => { e.dataset.p = p; e.innerHTML = p === "cancelling" ? `<i class="spin"></i>${LABEL[p]}` : LABEL[p]; });
   bind("target", (e) => (e.textContent = host ? `Self-hosted (${host})` : "No server set up"));
   bind("fname", (e) => (e.textContent = S.folder ? `${S.folder.name}/` : "No folder selected"));
   bind("fsub", (e) => (e.textContent = !S.folder ? "Pick a folder with an .ntop file" : S.folder.notebook || "No .ntop file in this folder"));
@@ -105,7 +105,7 @@ function render() {
   // While the solver iterates, the bar runs 0 to the max iteration and the chart shows convergence. Once the iterating block finishes, both give way to plain step progress.
   const its = parseIters(S.log), lastIt = its[its.length - 1], finished = optResult(S.log);
   const iterating = !!lastIt && !finished && p === "solve";
-  const up = p === "upload" ? S.upload : null;
+  const up = p === "upload" || p === "download" ? S.upload : null;
   const pr = $("prog");
   pr.classList.toggle("indet", live && !iterating && !up);
   (pr.firstChild as HTMLElement).style.width =
@@ -124,9 +124,10 @@ function render() {
   bind("cost", (e) => (e.textContent = S.t0 ? `${fmt(elapsed)} elapsed` : ""));
 
   const go = $<HTMLButtonElement>("go");
+  const cancelling = p === "cancelling";
   go.classList.toggle("stop", live);
-  go.textContent = live ? "Cancel" : p === "done" ? "Solve again" : "Send & solve";
-  go.disabled = !live && (!S.folder?.notebook || !host);
+  go.innerHTML = cancelling ? `<i class="spin"></i>Cancelling` : live ? "Cancel" : p === "done" ? "Solve again" : "Send &amp; solve";
+  go.disabled = cancelling || (!live && (!S.folder?.notebook || !host));
 
   const box = $("log");
   box.hidden = !S.showAll;
@@ -148,6 +149,7 @@ function onStats(st: Stats) {
 }
 
 function onStatus(p: Phase) {
+  if (p !== S.phase) S.upload = null;
   S.phase = p;
   if (!RUNNING.includes(p)) S.tEnd = Date.now();
   schedule();
@@ -179,7 +181,11 @@ async function start() {
   }
 }
 
-$("go").addEventListener("click", () => (running() ? void be.cancelJob() : void start()));
+$("go").addEventListener("click", () => {
+  if (S.phase === "cancelling") return;
+  if (running()) { S.phase = "cancelling"; render(); void be.cancelJob(); }
+  else void start();
+});
 $("choose").addEventListener("click", async () => {
   const f = await be.pickFolder();
   if (!f) return;

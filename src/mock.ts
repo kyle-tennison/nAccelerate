@@ -56,11 +56,21 @@ export class MockBackend implements Backend {
   minimize() {}
   close() {}
 
+  private stopping = false;
+
   async cancelJob() {
-    window.clearInterval(this.timer);
-    this.log("W", "Cancelled; remote solve stopped");
-    this.log("I", "Disconnected from preview host");
-    this.status("idle");
+    this.stopping = true;
+    this.status("cancelling");
+    this.log("I", "Stopping the remote solve");
+    window.setTimeout(() => {
+      window.clearInterval(this.timer);
+      this.stopping = false;
+      this.log("I", "Remote solve stopped");
+      this.log("I", "Removed the remote job folder");
+      this.log("W", "Cancelled");
+      this.log("I", "Disconnected from preview host");
+      this.status("idle");
+    }, 2500);
   }
 
   async startJob(req: JobRequest) {
@@ -72,7 +82,7 @@ export class MockBackend implements Backend {
     this.log("I", "Connecting to preview host");
     this.timer = window.setInterval(() => {
       const line = SAMPLE_LOG[Math.min(cursor, SAMPLE_LOG.length - 1)] ?? "";
-      const busy = phase === "solve";
+      const busy = phase === "solve" && !this.stopping;
       const parallel = busy && /itr:|Static Structural|Mesh|FE Model/.test(line);
       mem += ((busy ? req.mem * 0.6 : 1) - mem) * 0.2;
       this.h?.stats({
@@ -81,6 +91,7 @@ export class MockBackend implements Backend {
         gpus: Array.from({ length: req.gpu }, () => ({ util: busy ? 0.6 + Math.random() * 0.3 : 0.01, vram: busy ? 0.63 : 0.03 })),
       });
       const elapsed = Date.now() - since;
+      if (this.stopping) return;
       if (phase === "queued" && elapsed > 1500) {
         phase = "upload"; since = Date.now(); this.status(phase);
         this.log("I", `Uploading ${req.folder.split(/[\\/]/).pop()}/`);

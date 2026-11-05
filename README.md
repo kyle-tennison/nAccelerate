@@ -8,8 +8,8 @@ A small desktop widget (Tauri) that sends an nTop project folder to a more power
 2. Send & solve streams the chosen folder to a fresh job folder on the server as a tar archive over ssh, so the upload has a real progress bar. Other `.ntop` files in the folder, such as earlier `_solved` copies, are left out because the solver expects exactly one notebook.
 3. The solve command runs over `ssh` inside the job folder (default `ntop --input {folder}`). It receives `NTOP_EMAIL`, `NTOP_PASSWORD` (sent over stdin, not on the command line), `NACCEL_JOB`, `NACCEL_CPUS`, `NACCEL_CPUSET`, `NACCEL_MEM_GB` and `NACCEL_GPUS`. `{folder}`, `{job}`, `{cpus}`, `{cpu_last}`, `{mem_gb}` and `{gpus}` in the command are also filled in.
 4. A second ssh connection streams `/proc/stat`, `/proc/meminfo` and `nvidia-smi` once a second for the CPU tiles, memory bar and GPU meters. The first `NACCEL_CPUS` cores are shown, so pin the solver to `NACCEL_CPUSET`.
-5. When the solver prints `Saved: <path>`, that file is downloaded next to the local notebook (as `<name>_solved.ntop`, or replacing it), the remote job folder is removed and the connection is closed.
-6. Cancel kills the remote shell's process group and then runs the cancel command (default `sg docker -c 'docker rm -f {job}'`), since closing ssh does not stop a Docker container.
+5. When the solver prints `Saved: <path>`, that file is downloaded over ssh with a progress bar next to the local notebook (as `<name>_solved.ntop`, or replacing it), the remote job folder is removed and the connection is closed.
+6. Cancel shows a Cancelling state while it terminates the remote process group (killing it after 10 s), runs the cancel command (default `sg docker -c 'docker rm -f {job}'`, since closing ssh does not stop a Docker container), confirms the processes are gone, removes the remote job folder and only then disconnects.
 
 The system OpenSSH client is used, so the server must accept key-based login (no password prompts). The server is assumed to be Linux.
 

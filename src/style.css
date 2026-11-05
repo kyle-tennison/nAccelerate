@@ -87,6 +87,11 @@ label.btn input[type=file] { position: absolute; opacity: 0; width: 1px; height:
 .chip[data-p="upload"], .chip[data-p="download"] { color: var(--warn); border-color: currentColor }
 .chip[data-p="solve"] { color: var(--accent-2); border-color: currentColor }
 .chip[data-p="done"] { color: var(--ok); border-color: currentColor }
+.chip[data-p="cancelling"] { color: var(--bad); border-color: currentColor; display: inline-flex; align-items: center; gap: 5px }
+.spin { display: inline-block; width: .9em; height: .9em; border: 1.5px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: spin .8s linear infinite; flex: none }
+.btn .spin { margin-right: 6px; vertical-align: -.1em }
+@keyframes spin { to { transform: rotate(360deg) } }
+@media (prefers-reduced-motion: reduce) { .spin { animation-duration: 2.4s } }
 .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ink-2); flex: none }
 .dot[data-p="solve"] { background: var(--viz); animation: pulse 1.2s infinite }
 .dot[data-p="upload"], .dot[data-p="download"] { background: var(--warn) }

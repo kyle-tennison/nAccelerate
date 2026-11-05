@@ -2,12 +2,12 @@ mod job;
 mod remote;
 mod settings;
 mod stats;
-mod upload;
+mod transfer;
 
 use serde::Serialize;
 use settings::{HostInfo, Provider, Settings};
 use std::sync::Mutex;
-use tauri::{AppHandle, State};
+use tauri::{AppHandle, Emitter, State};
 use tokio::sync::watch;
 
 const KEYRING_SERVICE: &str = "nAccelerate";
@@ -85,9 +85,10 @@ fn start_job(app: AppHandle, state: State<JobState>, request: job::JobRequest) -
 }
 
 #[tauri::command]
-fn cancel_job(state: State<JobState>) {
+fn cancel_job(app: AppHandle, state: State<JobState>) {
     if let Ok(slot) = state.0.lock() {
-        if let Some(tx) = slot.as_ref() {
+        if let Some(tx) = slot.as_ref().filter(|tx| !tx.is_closed()) {
+            let _ = app.emit("job-status", "cancelling");
             let _ = tx.send(true);
         }
     }
